@@ -135,6 +135,7 @@ fun HomeScreen(
                         onShare = { sharePdf(context, NotebookStore.pdfFile(it.id)) },
                         onRename = { docs.renaming = it },
                         onDelete = { docs.deleting = it },
+                        onTags = { docs.tagging = it },
                     )
                     Half(
                         title = "Холсты",
@@ -147,6 +148,7 @@ fun HomeScreen(
                         onShare = { sharePdf(context, NotebookStore.pdfFile(it.id)) },
                         onRename = { docs.renaming = it },
                         onDelete = { docs.deleting = it },
+                        onTags = { docs.tagging = it },
                     )
                 }
             }
@@ -173,6 +175,7 @@ private fun Half(
     onShare: (NotebookEntry) -> Unit,
     onRename: (NotebookEntry) -> Unit,
     onDelete: (NotebookEntry) -> Unit,
+    onTags: (NotebookEntry) -> Unit,
     leading: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     // Заметки — тёплый бледно-зелёный фон, холсты — бледно-голубой: лёгкие светлые пастельные тона в любой теме,
@@ -214,6 +217,7 @@ private fun Half(
                         onSharePdf = { onShare(e) },
                         onRename = { onRename(e) },
                         onDelete = { onDelete(e) },
+                        onTags = { onTags(e) },
                         modifier = Modifier.height(cardHeight),
                         ink = ink,
                     )

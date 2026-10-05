@@ -69,6 +69,8 @@ data class NotebookMeta(
     val links: List<DocLink> = emptyList(),
     /** Закладки доски. */
     val bookmarks: List<Bookmark> = emptyList(),
+    /** Текстовые теги документа («планерка», «идеи»). */
+    val tags: List<String> = emptyList(),
 ) {
     val isBoard get() = kind == DocKind.BOARD
 
@@ -136,6 +138,37 @@ object NotebookFormat {
     }
 
     private fun metaToJson(m: NotebookMeta) = MetaJson.toJson(m)
+
+    /**
+     * Заменить в файле только meta.json, остальное (штрихи, миниатюра, исходный PDF) копируется как есть, без разбора.
+     * Поэтому правка метаданных (теги) не может повредить штрихи, даже если их не удаётся прочитать. Запись атомарная.
+     */
+    fun replaceMeta(file: File, meta: NotebookMeta) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        try {
+        ZipFile(file).use { src ->
+            FileOutputStream(tmp).use { fos ->
+                ZipOutputStream(fos.buffered()).use { zip ->
+                    zip.putNextEntry(ZipEntry(META))
+                    zip.write(metaToJson(meta).toString(2).toByteArray())
+                    zip.closeEntry()
+                    for (entry in src.entries()) {
+                        if (entry.name == META) continue
+                        zip.putNextEntry(ZipEntry(entry.name))
+                        src.getInputStream(entry).use { it.copyTo(zip) }
+                        zip.closeEntry()
+                    }
+                    zip.flush()
+                    fos.fd.sync()
+                }
+            }
+        }
+        if (!tmp.renameTo(file)) throw IOException("Не удалось заменить ${file.name}")
+        } catch (e: Exception) {
+            tmp.delete() // не оставляем недописанный временный файл
+            throw e
+        }
+    }
 
     /** Штрихи страницы: число штрихов, затем для каждого — кисть и входные точки Ink. */
     private fun writeStrokes(strokes: List<Stroke>): ByteArray {

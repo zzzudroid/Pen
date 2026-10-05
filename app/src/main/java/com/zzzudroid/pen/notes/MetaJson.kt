@@ -35,6 +35,7 @@ object MetaJson {
         }
         put("docId", m.docId)
         put("links", JSONArray(m.links.map(::linkToJson)))
+        if (m.tags.isNotEmpty()) put("tags", JSONArray(m.tags))
         put("bookmarks", JSONArray(m.bookmarks.map { b ->
             JSONObject().put("id", b.id).put("name", b.name).put("view", viewToJson(b.view))
         }))
@@ -112,6 +113,7 @@ object MetaJson {
         }
         val links = j.optJSONArray("links")
         val bookmarks = j.optJSONArray("bookmarks")
+        val tags = j.optJSONArray("tags")
         return NotebookMeta(
             title = j.optString("title", fileName.removeSuffix(FileNames.EXTENSION)),
             template = template,
@@ -127,6 +129,7 @@ object MetaJson {
             },
             docId = j.optString("docId").ifBlank { legacyDocId(fileName) },
             links = if (links == null) emptyList() else List(links.length()) { linkFromJson(links.getJSONObject(it)) },
+            tags = if (tags == null) emptyList() else Tags.clean(List(tags.length()) { tags.optString(it) }),
             bookmarks = if (bookmarks == null) emptyList() else List(bookmarks.length()) {
                 val b = bookmarks.getJSONObject(it)
                 Bookmark(b.getString("id"), b.getString("name"), viewFromJson(b.getJSONObject("view")))

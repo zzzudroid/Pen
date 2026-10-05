@@ -41,6 +41,7 @@ import com.zzzudroid.pen.canvas.PageTemplate
 import com.zzzudroid.pen.notes.HomeLogic
 import com.zzzudroid.pen.notes.NotebookEntry
 import com.zzzudroid.pen.notes.NotebookStore
+import com.zzzudroid.pen.notes.Tags
 import com.zzzudroid.pen.notes.importPdf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +67,7 @@ class DocumentsState(
     var importing by mutableStateOf(false)
     var renaming by mutableStateOf<NotebookEntry?>(null)
     var deleting by mutableStateOf<NotebookEntry?>(null)
+    var tagging by mutableStateOf<NotebookEntry?>(null)
 
     /** Выполнить операцию с хранилищем на IO, показать ошибку, если она случилась, и обновить список. */
     fun storeOp(action: () -> Unit) {
@@ -164,6 +166,19 @@ fun DocumentDialogs(state: DocumentsState) {
             onConfirm = { newTitle ->
                 state.renaming = null
                 state.storeOp { NotebookStore.rename(e.id, newTitle) }
+            },
+        )
+    }
+
+    state.tagging?.let { e ->
+        TagsDialog(
+            title = "Теги: ${e.meta?.title ?: e.file.nameWithoutExtension}",
+            initial = e.meta?.tags.orEmpty(),
+            known = Tags.counts(state.entries.orEmpty().mapNotNull { it.meta?.tags }),
+            onDismiss = { state.tagging = null },
+            onSave = { tags ->
+                state.tagging = null
+                state.storeOp { NotebookStore.setTags(e.id, tags) }
             },
         )
     }

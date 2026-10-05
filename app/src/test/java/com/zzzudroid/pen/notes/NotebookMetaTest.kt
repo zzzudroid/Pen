@@ -39,6 +39,21 @@ class NotebookMetaTest {
     }
 
     @Test
+    fun `теги записываются и читаются, чистятся при чтении`() {
+        val text = MetaJson.text(meta().copy(tags = listOf("Идеи", "планерка")))
+        assertEquals(listOf("Идеи", "планерка"), MetaJson.parse(text, "x.pen", 0, false).tags)
+        // файл со «грязными» тегами: дубли, пробелы, решётки
+        val dirty = text.replace("\"Идеи\"", "\" #идеи \", \"Идеи\", \"\"")
+        assertEquals(listOf("идеи", "планерка"), MetaJson.parse(dirty, "x.pen", 0, false).tags)
+    }
+
+    @Test
+    fun `старый файл без тегов читается с пустым списком`() {
+        assertTrue(MetaJson.parse(v2Json, "Старая.pen", 0, false).tags.isEmpty())
+        assertTrue(MetaJson.parse(MetaJson.text(meta()), "x.pen", 0, false).tags.isEmpty())
+    }
+
+    @Test
     fun `ссылка без закладки и вида читается с пустыми необязательными полями`() {
         val link = DocLink("l1", "p1", 0f, 0f, 5f, 5f, LinkTarget("doc-2"))
         val back = MetaJson.parse(MetaJson.text(meta(listOf(link))), "x.pen", 0, false)

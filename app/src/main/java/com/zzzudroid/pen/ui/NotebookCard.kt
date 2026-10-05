@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -58,6 +59,7 @@ fun NotebookCard(
     onSharePdf: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onTags: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** Цвет надписей на светлой пастельной подложке главного экрана; null — обычная тёмная/светлая карточка темы. */
     ink: Color? = null,
@@ -93,8 +95,17 @@ fun NotebookCard(
                     if (entry.meta != null) {
                         DropdownMenuItem(text = { Text("Поделиться PDF") }, onClick = { menu = false; onSharePdf() })
                         DropdownMenuItem(text = { Text("Переименовать") }, onClick = { menu = false; onRename() })
+                        DropdownMenuItem(text = { Text("Теги…") }, onClick = { menu = false; onTags() })
                     }
                     DropdownMenuItem(text = { Text("Удалить") }, onClick = { menu = false; onDelete() })
+                }
+            }
+            // Теги — ярлыки внизу миниатюры: два первых и «+N»
+            val tags = entry.meta?.tags.orEmpty()
+            if (tags.isNotEmpty()) {
+                Row(Modifier.align(Alignment.BottomStart).padding(6.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+                    tags.take(2).forEach { TagBadge(it) }
+                    if (tags.size > 2) TagBadge("+${tags.size - 2}")
                 }
             }
             // Размер файла сверху на миниатюре; тёмная полупрозрачная подложка читается и на светлой странице, и на тёмной доске
@@ -142,4 +153,20 @@ fun NotebookCard(
             }
         }
     }
+}
+
+/** Ярлык тега на миниатюре: тёмная полупрозрачная подложка читается и на светлой странице, и на тёмной доске. */
+@Composable
+private fun TagBadge(text: String) {
+    Text(
+        text,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        color = Color.White,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier
+            .widthIn(max = 84.dp)
+            .background(Color(0xB3000000), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }

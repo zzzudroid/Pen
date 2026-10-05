@@ -149,6 +149,14 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     /** Перенести вид в [v] (для ссылки на место того же документа). */
     fun showView(v: ViewState) = goToView(v)
 
+    /** Заменить теги открытого документа (сохраняются обычным автосохранением). */
+    fun setTags(tags: List<String>) {
+        val m = meta ?: return
+        meta = m.copy(tags = Tags.clean(tags))
+        dirty = true
+        onContentChanged()
+    }
+
     override fun onContentChanged() {
         if (!loaded) return
         dirty = true

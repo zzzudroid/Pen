@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.NavigateBefore
 import androidx.compose.material.icons.automirrored.outlined.NavigateNext
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.CloudOff
@@ -111,6 +112,7 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
 
     var confirmDeletePage by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
+    var showTags by remember { mutableStateOf(false) }
     var showBacklinks by remember { mutableStateOf(false) }
     val meta = vm.meta
     val context = LocalContext.current
@@ -215,6 +217,11 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                         }
                     }
                     if (meta != null) {
+                        IconButton(onClick = { showTags = true }) {
+                            Icon(Icons.AutoMirrored.Outlined.Label, contentDescription = "Теги")
+                        }
+                    }
+                    if (meta != null) {
                         IconButton(onClick = { showBacklinks = true }) {
                             Icon(Icons.Outlined.Link, contentDescription = "Откуда ссылаются")
                         }
@@ -304,6 +311,22 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                 if (linkDialog == 1) linkArea?.let { vm.addLink(it, target) } else vm.retargetLinks(vm.selectedLinks(), target)
                 linkDialog = 0
             },
+        )
+    }
+    if (showTags) {
+        // Теги всех документов — для подсказок; читаются при открытии диалога
+        var known by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            known = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.zzzudroid.pen.notes.Tags.counts(NotebookStore.list().mapNotNull { it.meta?.tags })
+            }
+        }
+        TagsDialog(
+            title = "Теги: ${meta?.title.orEmpty()}",
+            initial = meta?.tags.orEmpty(),
+            known = known,
+            onDismiss = { showTags = false },
+            onSave = { vm.setTags(it); showTags = false },
         )
     }
     if (showBookmarks) BookmarksSheet(vm, onDismiss = { showBookmarks = false })

@@ -153,6 +153,13 @@ object NotebookStore {
         if (!ok) Log.w(TAG, "Не удалось переименовать ${src.name} → ${dst.name}")
     }
 
+    /** Заменить теги документа [id]: меняется только meta.json, штрихи не затрагиваются. */
+    fun setTags(id: String, tags: List<String>) {
+        val file = file(id)
+        val meta = NotebookFormat.readMeta(file)
+        NotebookFormat.replaceMeta(file, meta.copy(tags = Tags.clean(tags)))
+    }
+
     fun delete(id: String) {
         if (!file(id).delete()) throw IOException("Не удалось удалить $id")
         // PDF-копии может и не быть — это не ошибка
