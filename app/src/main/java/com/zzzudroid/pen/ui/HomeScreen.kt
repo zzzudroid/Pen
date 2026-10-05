@@ -175,9 +175,13 @@ private fun Half(
     onDelete: (NotebookEntry) -> Unit,
     leading: (@Composable BoxScope.() -> Unit)? = null,
 ) {
-    // Заметки и холсты — разные оттенки фона, чтобы половины отличались с первого взгляда
-    val tint = if (kind == DocKind.BOARD) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.28f)
-    else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+    // Заметки — тёплый бледно-зеленоватый фон, холсты — бледно-голубоватый: половины отличаются с первого взгляда
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val tint = if (kind == DocKind.BOARD) {
+        if (dark) androidx.compose.ui.graphics.Color(0xFF1B2733) else androidx.compose.ui.graphics.Color(0xFFDDEBF6)
+    } else {
+        if (dark) androidx.compose.ui.graphics.Color(0xFF232C1F) else androidx.compose.ui.graphics.Color(0xFFEAF1DC)
+    }
     Column(
         modifier.clip(RoundedCornerShape(20.dp)).background(tint).padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
