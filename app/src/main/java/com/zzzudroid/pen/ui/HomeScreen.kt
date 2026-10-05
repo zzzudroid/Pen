@@ -117,7 +117,7 @@ fun HomeScreen(
                 !docs.hasAccess -> AccessRequest()
                 else -> Row(
                     Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Half(
                         leading = {

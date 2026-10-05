@@ -110,7 +110,7 @@ fun NotebookCard(
             )
         }
         // Миниатюра отделена от блока подписи: линия и слегка затемнённая подложка подписи
-        if (ink != null) androidx.compose.material3.HorizontalDivider(color = ink.copy(alpha = 0.50f), thickness = 0.67.dp)
+        if (ink != null) androidx.compose.material3.HorizontalDivider(color = ink.copy(alpha = 0.50f), thickness = 2.dp)
         Row(
             Modifier
                 .fillMaxWidth()
