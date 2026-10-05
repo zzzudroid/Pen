@@ -1,5 +1,19 @@
 package com.zzzudroid.pen.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material.icons.outlined.CropFree
+import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.FullscreenExit
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -21,7 +35,6 @@ import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.FitScreen
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
@@ -81,9 +94,14 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Полноэкранный режим: рабочая область на весь экран, без панелей и системных полос
+    var fullscreen by rememberSaveable { mutableStateOf(false) }
+    SystemBarsHidden(fullscreen)
+    BackHandler(enabled = fullscreen) { fullscreen = false }
+
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (!fullscreen) TopAppBar(
                 title = { Text(meta?.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -120,11 +138,15 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                     IconButton(onClick = vm::redo, enabled = vm.canRedo) {
                         Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Повторить")
                     }
+                    // Страница целиком ↔ по ширине (у доски — вернуться в начало)
                     IconButton(onClick = vm::resetView) {
                         Icon(
-                            Icons.Outlined.FitScreen,
-                            contentDescription = if (vm.isBoard) "Вернуться в начало" else "Вписать страницу",
+                            Icons.Outlined.CropFree,
+                            contentDescription = if (vm.isBoard) "Вернуться в начало" else "Страница целиком",
                         )
+                    }
+                    IconButton(onClick = { fullscreen = true }) {
+                        Icon(Icons.Outlined.Fullscreen, contentDescription = "На весь экран")
                     }
                 },
             )
@@ -139,7 +161,7 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                 )
                 meta == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else -> Column(Modifier.fillMaxSize()) {
-                    CanvasToolbar(vm)
+                    if (!fullscreen) CanvasToolbar(vm)
                     SelectionBar(vm)
                     AndroidView(
                         factory = { ctx ->
@@ -158,7 +180,7 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
                     // У доски нет страниц — панель страниц не нужна
-                    if (!vm.isBoard) {
+                    if (!vm.isBoard && !fullscreen) {
                     HorizontalDivider()
                     PageBar(
                         index = vm.pageIndex,
@@ -170,6 +192,16 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                     )
                     }
                 }
+            }
+            if (fullscreen && meta != null && vm.loadError == null) {
+                FullscreenControls(
+                    canUndo = vm.canUndo,
+                    canRedo = vm.canRedo,
+                    onUndo = vm::undo,
+                    onRedo = vm::redo,
+                    onExit = { fullscreen = false },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                )
             }
         }
     }
@@ -238,4 +270,57 @@ private fun drawPdfBackground(
     pdfBorderPaint.strokeWidth = 1f / scale
     canvas.drawRect(rect, pdfBorderPaint)
     return true
+}
+
+/** Маленькая плавающая панель полноэкранного режима: отменить, повторить, выйти. */
+@Composable
+private fun FullscreenControls(
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        tonalElevation = 3.dp,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onUndo, enabled = canUndo) {
+                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Отменить")
+            }
+            IconButton(onClick = onRedo, enabled = canRedo) {
+                Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Повторить")
+            }
+            IconButton(onClick = onExit) {
+                Icon(Icons.Outlined.FullscreenExit, contentDescription = "Выйти из полноэкранного режима")
+            }
+        }
+    }
+}
+
+/** Прячет системные полосы (статус и навигация) на время [hidden]; по свайпу от края появляются на миг. */
+@Composable
+private fun SystemBarsHidden(hidden: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(hidden) {
+        val window = view.context.findActivity()?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        if (hidden) {
+            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
