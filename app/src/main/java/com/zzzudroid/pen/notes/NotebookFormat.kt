@@ -284,7 +284,11 @@ object NotebookFormat {
             setScale(fit.scale, fit.scale)
             postTranslate(fit.dx, fit.dy)
         }
+        // Матрицу применяем к холсту сами — Ink использует её параметр только для расчёта толщины
+        c.save()
+        c.concat(m)
         for (s in strokes) renderer.draw(c, s, m)
+        c.restore()
         return bmp
     }
 
@@ -308,8 +312,9 @@ object NotebookFormat {
             c.scale(scale, scale)
             drawPage(c, spec, scale)
         }
-        val identity = Matrix()
-        for (s in strokes) renderer.draw(c, s, identity)
+        // Холст уже промасштабирован выше; Ink сообщаем то же преобразование
+        val canvasMatrix = Matrix().apply { setScale(scale, scale) }
+        for (s in strokes) renderer.draw(c, s, canvasMatrix)
         return bmp
     }
 }

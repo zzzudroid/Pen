@@ -280,7 +280,9 @@ open class CanvasViewModel : ViewModel() {
             else -> PEN_SIZES
         }
         val color = if (tool == CanvasTool.HIGHLIGHTER) highlighterColor(base) else base
-        return Brush.createWithColorIntArgb(family, color, sizes[sizeIndex] * density, BRUSH_EPSILON)
+        // Размер хранится в единицах холста: делим на масштаб вида, чтобы на экране линия была заданной толщины
+        // при любом увеличении (лист вписан по ширине — масштаб около 3)
+        return Brush.createWithColorIntArgb(family, color, sizes[sizeIndex] * density / viewport.scale, BRUSH_EPSILON)
     }
 
     /** Матрица мир → экран. */

@@ -63,6 +63,11 @@ adb logcat -s PenDiag
 - `notes/PdfExporter` — векторный PDF рядом с `.pen` (контуры `outlinesToPath`, не `CanvasStrokeRenderer`),
   пишется под тем же `writeLock` сразу после `.pen`; ошибка PDF не откатывает `.pen` (`pdfError`).
   «Поделиться» — `FileProvider` (`${applicationId}.files`), перед отправкой `saveAndAwait()`.
+- **Ink `CanvasStrokeRenderer.draw(canvas, stroke, matrix)` НЕ применяет `matrix` к холсту** — параметр нужен только для
+  расчёта толщины; положение задаёт текущая матрица `Canvas`. Всегда `canvas.save(); canvas.concat(m); draw(..., m); canvas.restore()`.
+  Толщина кисти хранится в единицах холста: `размер в dp × density ÷ viewport.scale`.
+- Проверка на планшете без пера: `adb shell input stylus swipe …` рисует (как касание), в тетради включить «Рисовать пальцем»;
+  скриншот `screencap` не показывает штрих в процессе (он в front-buffer) — снимать после паузы.
 - API androidx.ink сверять по фактическим классам библиотеки (javap), документация к alpha-версиям расходится с 1.0.
 - `BuildConfig.BUILD_TIME / GIT_HASH / GIT_DIRTY` — для экрана «О программе»; генерация BuildConfig
   никогда не считается up-to-date.

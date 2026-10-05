@@ -453,8 +453,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                 canvas.restore()
             }
             // Во время перетаскивания выделенные штрихи рисует оверлей
+            // Ink не применяет переданную матрицу к холсту, а только учитывает её при расчёте толщины:
+            // положение штрихов задаёт сам холст, поэтому матрицу вида применяем к нему явно
             val hidden = if (preview != null) previewSet else null
+            canvas.save()
+            canvas.concat(matrix)
             for (s in vm.strokes) if (hidden == null || s !in hidden) renderer.draw(canvas, s, matrix)
+            canvas.restore()
         }
     }
 
@@ -688,7 +693,10 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                 transformMatrix.setScale(t.scale, t.scale, t.anchorX, t.anchorY)
                 transformMatrix.postTranslate(t.dx, t.dy)
                 matrix.preConcat(transformMatrix)
+                canvas.save()
+                canvas.concat(matrix)
                 for (s in vm.selection) renderer.draw(canvas, s, matrix)
+                canvas.restore()
             }
 
             // Петля, которую сейчас рисуют
