@@ -8,6 +8,7 @@ composeBom = "2024.10.01"
 navigationCompose = "2.8.4"
 junit = "4.13.2"
 ink = "1.0.0"
+mlkitInk = "19.0.0"
 motionPrediction = "1.0.0"
 
 [libraries]
@@ -30,6 +31,7 @@ androidx-ink-rendering = { group = "androidx.ink", name = "ink-rendering", versi
 androidx-ink-storage = { group = "androidx.ink", name = "ink-storage", version.ref = "ink" }
 androidx-ink-strokes = { group = "androidx.ink", name = "ink-strokes", version.ref = "ink" }
 androidx-input-motionprediction = { group = "androidx.input", name = "input-motionprediction", version.ref = "motionPrediction" }
+mlkit-digital-ink = { group = "com.google.mlkit", name = "digital-ink-recognition", version.ref = "mlkitInk" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

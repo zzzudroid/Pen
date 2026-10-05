@@ -17,6 +17,7 @@ object Routes {
     const val HOME = "home"
     const val NOTES = "notes"
     const val NOTE = "note/{id}"
+    const val SEARCH = "search"
 
     fun note(id: String) = "note/" + Uri.encode(id)
     const val CANVAS = "canvas"
@@ -41,6 +42,13 @@ fun AppRoot(diagnostics: DiagnosticsViewModel) {
             }
             composable(Routes.NOTE) {
                 NoteEditorScreen(onBack = { nav.popBackStack() })
+            }
+            composable(Routes.SEARCH) {
+                SearchScreen(
+                    onBack = { nav.popBackStack() },
+                    // TODO: открыть сразу нужную страницу (pageIndex) — нужна поддержка в редакторе
+                    onOpen = { id, _ -> nav.navigate(Routes.note(id)) },
+                )
             }
             composable(Routes.CANVAS) {
                 CanvasScreen(onBack = { nav.popBackStack() })

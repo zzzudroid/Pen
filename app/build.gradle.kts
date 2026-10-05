@@ -98,6 +98,8 @@ dependencies {
     implementation(libs.androidx.ink.rendering)
     implementation(libs.androidx.ink.strokes)
     implementation(libs.androidx.ink.storage)
+    // Распознавание рукописи (поиск по тетрадям), модель скачивается на устройство
+    implementation(libs.mlkit.digital.ink)
     implementation(libs.androidx.input.motionprediction)
     debugImplementation(libs.androidx.ui.tooling)
 
