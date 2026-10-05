@@ -14,6 +14,7 @@ import com.zzzudroid.pen.diag.DiagnosticsViewModel
 // Маршруты навигации
 object Routes {
     const val HOME = "home"
+    const val CANVAS = "canvas"
     const val DIAGNOSTICS = "diagnostics"
     const val ABOUT = "about"
 }
@@ -29,6 +30,9 @@ fun AppRoot(diagnostics: DiagnosticsViewModel) {
         NavHost(navController = nav, startDestination = Routes.HOME) {
             composable(Routes.HOME) {
                 HomeScreen(onOpen = { route -> nav.navigate(route) })
+            }
+            composable(Routes.CANVAS) {
+                CanvasScreen(onBack = { nav.popBackStack() })
             }
             composable(Routes.DIAGNOSTICS) {
                 DiagnosticsScreen(diagnostics, onBack = { nav.popBackStack() })

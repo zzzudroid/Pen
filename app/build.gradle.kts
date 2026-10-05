@@ -91,6 +91,13 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+    // Холст: штрихи, кисти, геометрия и отрисовка с низкой задержкой (front buffer)
+    implementation(libs.androidx.ink.authoring)
+    implementation(libs.androidx.ink.brush)
+    implementation(libs.androidx.ink.geometry)
+    implementation(libs.androidx.ink.rendering)
+    implementation(libs.androidx.ink.strokes)
+    implementation(libs.androidx.input.motionprediction)
     debugImplementation(libs.androidx.ui.tooling)
 
     // Юнит-тесты логики диагностики — чистый JVM, без эмулятора

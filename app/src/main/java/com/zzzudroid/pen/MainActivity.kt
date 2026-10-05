@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import com.zzzudroid.pen.canvas.StylusPresence
 import com.zzzudroid.pen.diag.DiagnosticsViewModel
 import com.zzzudroid.pen.ui.AppRoot
 
@@ -30,6 +31,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
+        StylusPresence.onGenericMotion(ev)
         diagnostics.onRawMotion(ev)
         return super.dispatchGenericMotionEvent(ev)
     }

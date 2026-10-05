@@ -32,5 +32,9 @@ adb logcat -s PenDiag
   независимо от Compose-обёртки.
 - `diag/PenStats.kt` — чистая логика сводки (без Android), покрыта JVM-тестами.
 - `diag/PenInputView.kt` — тестовая зона (обычный `View` в `AndroidView`, отрисовка через Bitmap).
+- `canvas/` — холст: `DrawingSurface` (слой готовых штрихов + `InProgressStrokesView`, вся маршрутизация
+  указателей, жесты, ластик), `CanvasViewModel` (штрихи в мировых координатах, история, вид, кисть),
+  `Viewport` и `History` — чистый Kotlin с тестами. `StylusPresence` получает hover из `MainActivity`.
+- API androidx.ink сверять по фактическим классам библиотеки (javap), документация к alpha-версиям расходится с 1.0.
 - `BuildConfig.BUILD_TIME / GIT_HASH / GIT_DIRTY` — для экрана «О программе»; генерация BuildConfig
   никогда не считается up-to-date.
