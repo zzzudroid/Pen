@@ -15,6 +15,9 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.ink.authoring.InProgressStrokeId
 import androidx.ink.authoring.InProgressStrokesFinishedListener
+import androidx.ink.brush.InputToolType
+import androidx.ink.strokes.MutableStrokeInputBatch
+import androidx.ink.strokes.StrokeInput
 import androidx.ink.authoring.InProgressStrokesView
 import androidx.ink.geometry.AffineTransform
 import androidx.ink.geometry.ImmutableParallelogram
@@ -50,6 +53,51 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
     // Рисующие указатели: id указателя → id штриха в InProgressStrokesView
     private val drawing = HashMap<Int, InProgressStrokeId>()
+
+    // Сглаживание штриха: id указателя → фильтр (только пока сглаживание включено)
+    private val smoothers = HashMap<Int, SmoothedStroke>()
+
+    /**
+     * Точки штриха через адаптивный фильтр One Euro: на медленных движениях дрожание гасится сильно,
+     * на быстрых линия почти не отстаёт. Координаты — мировые; давление, наклон и азимут берутся из события как есть.
+     */
+    private inner class SmoothedStroke(level: Int, private val downTime: Long) {
+        // Чем сильнее сглаживание, тем ниже минимальная частота среза и слабее реакция на скорость
+        private val fx = OneEuro(minCutoff = when (level) { 1 -> 4f; 2 -> 2f; else -> 1f }, beta = when (level) { 1 -> 0.02f; 2 -> 0.01f; else -> 0.006f })
+        private val fy = OneEuro(minCutoff = fx.minCutoff, beta = fx.beta)
+
+        private fun input(ev: MotionEvent, i: Int, t: Long, x: Float, y: Float, h: Int): StrokeInput {
+            val pressure = if (h < 0) ev.getPressure(i) else ev.getHistoricalPressure(i, h)
+            val orientation = if (h < 0) ev.getOrientation(i) else ev.getHistoricalOrientation(i, h)
+            val tilt = if (h < 0) ev.getAxisValue(MotionEvent.AXIS_TILT, i) else ev.getHistoricalAxisValue(MotionEvent.AXIS_TILT, i, h)
+            return StrokeInput.create(x, y, t, InputToolType.STYLUS, WORLD_UNIT_CM, pressure, tilt, orientation)
+        }
+
+        fun first(ev: MotionEvent, i: Int, w: FloatArray): StrokeInput {
+            fx.reset(w[0], 0L); fy.reset(w[1], 0L)
+            return input(ev, i, 0L, w[0], w[1], -1)
+        }
+
+        /** Все точки события (историческая пачка и текущая) — сглаженными. */
+        fun batch(ev: MotionEvent, i: Int): MutableStrokeInputBatch {
+            val out = MutableStrokeInputBatch()
+            for (h in 0 until ev.historySize) {
+                val t = ev.getHistoricalEventTime(h) - downTime
+                val w = worldPoint(ev.getHistoricalX(i, h), ev.getHistoricalY(i, h))
+                out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), h))
+            }
+            val t = ev.eventTime - downTime
+            val w = worldPoint(ev.getX(i), ev.getY(i))
+            out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), -1))
+            return out
+        }
+
+        /** Последняя точка — настоящая, без сглаживания: штрих заканчивается там, где отпустили перо. */
+        fun last(ev: MotionEvent, i: Int): StrokeInput {
+            val w = worldPoint(ev.getX(i), ev.getY(i))
+            return input(ev, i, ev.eventTime - downTime, w[0], w[1], -1)
+        }
+    }
 
     // Стирающие указатели: id → последняя точка в мировых координатах
     private val erasing = HashMap<Int, FloatArray>()
@@ -238,8 +286,18 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             erasing[id] = worldPoint(ev.getX(i), ev.getY(i))
             eraseAlong(erasing[id]!!, erasing[id]!!)
         } else {
-            vm.viewMatrix(viewMatrix).invert(worldMatrix)
-            drawing[id] = inProgress.startStroke(ev, id, brush, worldMatrix)
+            val level = com.zzzudroid.pen.settings.AppSettings.smoothing
+            if (level > 0) {
+                // Сглаженный штрих: точки идут через фильтр, а не прямо из MotionEvent
+                vm.viewMatrix(viewMatrix)
+                val sm = SmoothedStroke(level, ev.eventTime)
+                val first = sm.first(ev, i, worldPoint(ev.getX(i), ev.getY(i)))
+                drawing[id] = inProgress.startStroke(first, brush, Matrix(viewMatrix))
+                smoothers[id] = sm
+            } else {
+                vm.viewMatrix(viewMatrix).invert(worldMatrix)
+                drawing[id] = inProgress.startStroke(ev, id, brush, worldMatrix)
+            }
         }
     }
 
@@ -247,7 +305,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         if (drawing.isNotEmpty()) {
             val predicted = predictor.predict()
             for ((pid, strokeId) in drawing) {
-                if (ev.findPointerIndex(pid) >= 0) inProgress.addToStroke(ev, pid, strokeId, predicted)
+                val i = ev.findPointerIndex(pid)
+                if (i < 0) continue
+                val sm = smoothers[pid]
+                if (sm != null) inProgress.addToStroke(sm.batch(ev, i), strokeId, MutableStrokeInputBatch())
+                else inProgress.addToStroke(ev, pid, strokeId, predicted)
             }
             predicted?.recycle()
         }
@@ -274,11 +336,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         stylusDown -= id
         ignored -= id
 
+        val sm = smoothers.remove(id)
         drawing.remove(id)?.let { strokeId ->
             // Отпускание с FLAG_CANCELED — система решила, что касание случайное
             if (ev.flags and MotionEvent.FLAG_CANCELED != 0) inProgress.cancelStroke(strokeId, ev)
             else {
-                inProgress.finishStroke(ev, id, strokeId)
+                if (sm != null) inProgress.finishStroke(sm.last(ev, ev.findPointerIndex(id).coerceAtLeast(0)), strokeId)
+                else inProgress.finishStroke(ev, id, strokeId)
                 // Не ждать паузы-«отстоя»: сразу передать готовый штрих в слой штрихов
                 inProgress.requestHandoff()
             }
@@ -296,6 +360,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
     private fun resetAll() {
         drawing.clear()
+        smoothers.clear()
         erasing.clear()
         fingerErasePointer = null
         stylusDown.clear()
@@ -935,6 +1000,8 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
          * Сдвиг записи, ед. холста (±100 000 ≈ ±20 м). Не больше, чтобы дробная часть координат (float) не терялась
          * при сдвиге: на 100 000 точность ≈ 0,008 ед., при увеличении ×32 это четверть пикселя.
          */
+        /** Длина одной единицы мира в сантиметрах (5 ед./мм). */
+        const val WORLD_UNIT_CM = 0.02f
         const val OFFSET = 100_000 // = CanvasViewModel.WORLD_LIMIT
         private val IDENTITY = Matrix()
         const val TAP_MAX_MS = 250L

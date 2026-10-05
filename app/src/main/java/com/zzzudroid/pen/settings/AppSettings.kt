@@ -35,6 +35,9 @@ object AppSettings {
     /** Не гасить экран, пока открыт редактор. */
     var keepScreenOn by mutableStateOf(false); private set
 
+    /** Сглаживание пера: 0 — выкл, 1…3 — лёгкое, среднее, сильное. */
+    var smoothing by mutableStateOf(1); private set
+
     /** Цвет пера по умолчанию — номер в палитре. */
     var defaultColor by mutableStateOf(0); private set
 
@@ -51,6 +54,7 @@ object AppSettings {
         boardMinimap = p.getBoolean("boardMinimap", true)
         linksByTap = p.getBoolean("linksByTap", true)
         keepScreenOn = p.getBoolean("keepScreenOn", false)
+        smoothing = p.getInt("smoothing", 1).coerceIn(0, 3)
         defaultColor = p.getInt("defaultColor", 0)
         defaultSize = p.getInt("defaultSize", 1).coerceIn(0, 2)
     }
@@ -66,6 +70,7 @@ object AppSettings {
     fun putBoardMinimap(v: Boolean) { boardMinimap = v; save { putBoolean("boardMinimap", v) } }
     fun putLinksByTap(v: Boolean) { linksByTap = v; save { putBoolean("linksByTap", v) } }
     fun putKeepScreenOn(v: Boolean) { keepScreenOn = v; save { putBoolean("keepScreenOn", v) } }
+    fun putSmoothing(v: Int) { smoothing = v; save { putInt("smoothing", v) } }
     fun putDefaultColor(v: Int) { defaultColor = v; save { putInt("defaultColor", v) } }
     fun putDefaultSize(v: Int) { defaultSize = v; save { putInt("defaultSize", v) } }
 }

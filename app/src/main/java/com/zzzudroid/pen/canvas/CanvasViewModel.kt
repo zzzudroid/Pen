@@ -7,7 +7,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.ink.brush.Brush
+import androidx.ink.brush.BrushBehavior
+import androidx.ink.brush.BrushCoat
 import androidx.ink.brush.BrushFamily
+import androidx.ink.brush.BrushTip
 import androidx.ink.brush.StockBrushes
 import androidx.ink.strokes.Stroke
 import androidx.lifecycle.ViewModel
@@ -18,6 +21,7 @@ enum class CanvasTool(val title: String, val id: String) {
     PEN("Ручка", "pen"),
     MARKER("Маркер", "marker"),
     HIGHLIGHTER("Выделитель", "highlighter"),
+    CALLIGRAPHY("Каллиграфия", "calligraphy"),
     ERASER("Ластик", "eraser"),
     LASSO("Лассо", "lasso"),
 }
@@ -58,15 +62,40 @@ val PALETTE = listOf(
 )
 
 /** Стоковые семейства кистей Ink — создаются один раз. */
+@OptIn(androidx.ink.brush.ExperimentalInkCustomBrushApi::class)
 object Brushes {
     val pen: BrushFamily by lazy { StockBrushes.pressurePen() }
     val marker: BrushFamily by lazy { StockBrushes.marker() }
     val highlighter: BrushFamily by lazy { StockBrushes.highlighter() }
 
+    /**
+     * Каллиграфическое перо: узкий наконечник под постоянным углом (плоское перо), поэтому линия толще поперёк
+     * наклона пера и тоньше вдоль него; нажим меняет толщину. Угол не привязан к направлению штриха.
+     */
+    val calligraphy: BrushFamily by lazy {
+        val pressure = BrushBehavior(
+            source = BrushBehavior.Source.NORMALIZED_PRESSURE,
+            target = BrushBehavior.Target.SIZE_MULTIPLIER,
+            sourceValueRangeStart = 0f,
+            sourceValueRangeEnd = 1f,
+            targetModifierRangeStart = 0.75f,
+            targetModifierRangeEnd = 1.2f,
+        )
+        val tip = BrushTip(
+            scaleX = 0.28f,
+            scaleY = 1f,
+            cornerRounding = 0.15f,
+            rotationDegrees = 40f,
+            behaviors = listOf(pressure),
+        )
+        BrushFamily(coats = listOf(BrushCoat(tip)), clientBrushFamilyId = "calligraphy")
+    }
+
     fun family(tool: CanvasTool): BrushFamily? = when (tool) {
         CanvasTool.PEN -> pen
         CanvasTool.MARKER -> marker
         CanvasTool.HIGHLIGHTER -> highlighter
+        CanvasTool.CALLIGRAPHY -> calligraphy
         CanvasTool.ERASER, CanvasTool.LASSO -> null
     }
 
@@ -74,6 +103,7 @@ object Brushes {
     fun toolOf(family: BrushFamily): CanvasTool = when (family) {
         marker -> CanvasTool.MARKER
         highlighter -> CanvasTool.HIGHLIGHTER
+        calligraphy -> CanvasTool.CALLIGRAPHY
         else -> CanvasTool.PEN
     }
 }
@@ -422,6 +452,7 @@ open class CanvasViewModel : ViewModel() {
         val sizes = when (tool) {
             CanvasTool.MARKER -> MARKER_SIZES
             CanvasTool.HIGHLIGHTER -> HIGHLIGHTER_SIZES
+            CanvasTool.CALLIGRAPHY -> CALLIGRAPHY_SIZES
             else -> PEN_SIZES
         }
         val color = if (tool == CanvasTool.HIGHLIGHTER) highlighterColor(base) else base
@@ -451,6 +482,7 @@ open class CanvasViewModel : ViewModel() {
     companion object {
         val PEN_SIZES = listOf(1.2f, 2.5f, 5f)
         val MARKER_SIZES = listOf(3f, 6f, 12f)
+        val CALLIGRAPHY_SIZES = listOf(4f, 7f, 12f)
         val HIGHLIGHTER_SIZES = listOf(10f, 18f, 28f)
         const val BRUSH_EPSILON = 0.1f
         const val PAGE_MARGIN_DP = 16f

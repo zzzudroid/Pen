@@ -132,8 +132,28 @@ object ToolIcons {
         }
     }
 
+    /** Каллиграфия: плоское перо — широкий скошенный наконечник на ручке. */
+    val Calligraphy: ImageVector by lazy {
+        icon("Calligraphy") {
+            path(fill = fill, pathFillType = PathFillType.EvenOdd) {
+                // Скошенный плоский наконечник
+                moveTo(5f, 21f)
+                lineTo(8.2f, 11.2f)
+                lineTo(12.8f, 15.8f)
+                close()
+                // Ручка
+                moveTo(10f, 9.4f)
+                lineTo(17.8f, 1.6f)
+                lineTo(22.4f, 6.2f)
+                lineTo(14.6f, 14f)
+                close()
+            }
+        }
+    }
+
     fun of(tool: CanvasTool): ImageVector = when (tool) {
         CanvasTool.PEN -> Pen
+        CanvasTool.CALLIGRAPHY -> Calligraphy
         CanvasTool.MARKER -> Marker
         CanvasTool.HIGHLIGHTER -> Highlighter
         CanvasTool.ERASER -> Eraser

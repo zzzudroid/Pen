@@ -3,6 +3,7 @@ package com.zzzudroid.pen.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,8 +99,10 @@ private val ToolButtonSize = 44.dp
 @Composable
 fun CanvasToolbar(vm: CanvasViewModel) {
     Row(
+        // Инструментов много: при нехватке ширины (портрет) панель прокручивается, а не обрезается
         modifier = Modifier
             .fillMaxWidth()
+            .horizontalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

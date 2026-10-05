@@ -98,6 +98,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text("Сглаживание пера", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Убирает дрожание линии; чем сильнее, тем заметнее отставание линии от кончика",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Выкл", "Лёгкое", "Среднее", "Сильное").forEachIndexed { i, name ->
+                        FilterChip(selected = AppSettings.smoothing == i, onClick = { AppSettings.putSmoothing(i) }, label = { Text(name) })
+                    }
+                }
+            }
             SwitchRow(
                 "Стирать пальцем",
                 "Палец работает как ластик, перо рисует; применяется при открытии редактора",
