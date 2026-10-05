@@ -59,6 +59,8 @@ fun NotebookCard(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Цвет надписей на светлой пастельной подложке главного экрана; null — обычная тёмная/светлая карточка темы. */
+    ink: Color? = null,
 ) {
     val thumb by produceState<Bitmap?>(null, entry.file, entry.meta?.modified) {
         value = withContext(Dispatchers.IO) { NotebookFormat.readThumbnail(entry.file) }
@@ -67,9 +69,14 @@ fun NotebookCard(
     val fileSize = remember(entry.file, entry.meta?.modified) { Formatting.formatFileSize(entry.file.length()) }
     var menu by remember { mutableStateOf(false) }
 
-    Card(onClick = onOpen, modifier = modifier) {
+    Card(
+        onClick = onOpen,
+        modifier = modifier,
+        colors = if (ink != null) androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f), contentColor = ink)
+        else androidx.compose.material3.CardDefaults.cardColors(),
+    ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(210f / 297f).background(MaterialTheme.colorScheme.surfaceVariant),
+            Modifier.fillMaxWidth().aspectRatio(210f / 297f).background(if (ink != null) Color(0xFFF2F4EE) else MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             thumb?.let {
@@ -121,7 +128,7 @@ fun NotebookCard(
                     // Только дата; число страниц не показываем
                     entry.meta?.let { Formatting.formatDate(it.modified) } ?: (entry.error ?: ""),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = ink?.copy(alpha = 0.65f) ?: MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

@@ -175,13 +175,12 @@ private fun Half(
     onDelete: (NotebookEntry) -> Unit,
     leading: (@Composable BoxScope.() -> Unit)? = null,
 ) {
-    // Заметки — тёплый бледно-зеленоватый фон, холсты — бледно-голубоватый: половины отличаются с первого взгляда
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val tint = if (kind == DocKind.BOARD) {
-        if (dark) androidx.compose.ui.graphics.Color(0xFF1B2733) else androidx.compose.ui.graphics.Color(0xFFDDEBF6)
-    } else {
-        if (dark) androidx.compose.ui.graphics.Color(0xFF232C1F) else androidx.compose.ui.graphics.Color(0xFFEAF1DC)
-    }
+    // Заметки — тёплый бледно-зелёный фон, холсты — бледно-голубой: лёгкие светлые пастельные тона в любой теме,
+    // поэтому надписи и значки на них тёмные
+    val board = kind == DocKind.BOARD
+    val tint = if (board) androidx.compose.ui.graphics.Color(0xFFE1EFFA) else androidx.compose.ui.graphics.Color(0xFFEBF4DD)
+    val ink = if (board) androidx.compose.ui.graphics.Color(0xFF24394A) else androidx.compose.ui.graphics.Color(0xFF34402C)
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides ink) {
     Column(
         modifier.clip(RoundedCornerShape(20.dp)).background(tint).padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -207,7 +206,7 @@ private fun Half(
                 horizontalArrangement = Arrangement.spacedBy(HomeLogic.GAP_DP.dp),
                 verticalArrangement = Arrangement.spacedBy(HomeLogic.GAP_DP.dp),
             ) {
-                item(key = "create") { CreateTile(isBoard = kind == DocKind.BOARD, onClick = onCreate, height = cardHeight) }
+                item(key = "create") { CreateTile(isBoard = board, onClick = onCreate, height = cardHeight, light = ink) }
                 items(recent, key = { it.id }) { e ->
                     NotebookCard(
                         entry = e,
@@ -216,10 +215,12 @@ private fun Half(
                         onRename = { onRename(e) },
                         onDelete = { onDelete(e) },
                         modifier = Modifier.height(cardHeight),
+                        ink = ink,
                     )
                 }
             }
         }
+    }
     }
 }
 
@@ -228,21 +229,24 @@ private fun Half(
  * Нажатие создаёт документ и открывает его сразу, без диалога.
  */
 @Composable
-fun CreateTile(isBoard: Boolean, onClick: () -> Unit, height: androidx.compose.ui.unit.Dp? = null) {
+fun CreateTile(isBoard: Boolean, onClick: () -> Unit, height: androidx.compose.ui.unit.Dp? = null, light: androidx.compose.ui.graphics.Color? = null) {
     // Высота не задана (список) — как у карточки такой же ширины
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val h = height ?: HomeLogic.cardHeightFor(maxWidth.value).dp
+        // На светлой пастельной половине плитка полупрозрачно-белая, обводка и плюс — цвета надписей половины
         OutlinedCard(
             onClick = onClick,
             modifier = Modifier.fillMaxWidth().height(h),
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
+            colors = if (light != null) androidx.compose.material3.CardDefaults.outlinedCardColors(containerColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f))
+            else androidx.compose.material3.CardDefaults.outlinedCardColors(),
+            border = BorderStroke(2.dp, light?.copy(alpha = 0.28f) ?: MaterialTheme.colorScheme.outlineVariant),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Add,
                     contentDescription = if (isBoard) "Новый холст" else "Новая заметка",
                     modifier = Modifier.size(56.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = light?.copy(alpha = 0.75f) ?: MaterialTheme.colorScheme.primary,
                 )
             }
         }
