@@ -170,19 +170,21 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             return
         }
 
-        if (vm.drawWithFinger && fingers.isEmpty() && drawing.isEmpty() && ev.pointerCount == 1) {
-            startPen(ev, i, id)
+        // «Стирать пальцем»: один палец работает как штриховой ластик
+        if (vm.eraseWithFinger && fingers.isEmpty() && erasing.isEmpty() && ev.pointerCount == 1) {
+            fingerErasePointer = id
+            erasing[id] = worldPoint(ev.getX(i), ev.getY(i))
+            eraseAlong(erasing.getValue(id), erasing.getValue(id))
             return
         }
 
-        // Второй палец во время рисования пальцем: превращаем рисование в жест
-        if (drawing.isNotEmpty() && stylusDown.isEmpty()) {
-            drawing.values.forEach { inProgress.cancelStroke(it, ev) }
-            for (k in 0 until ev.pointerCount) {
-                val pid = ev.getPointerId(k)
-                if (drawing.containsKey(pid)) fingers[pid] = floatArrayOf(ev.getX(k), ev.getY(k))
-            }
-            drawing.clear()
+        // Второй палец во время стирания пальцем: завершаем стирание и превращаем жест в пан/зум
+        fingerErasePointer?.let { pid ->
+            finishErasing()
+            erasing.remove(pid)
+            fingerErasePointer = null
+            val k = ev.findPointerIndex(pid)
+            if (k >= 0) fingers[pid] = floatArrayOf(ev.getX(k), ev.getY(k))
         }
 
         if (fingers.isEmpty()) {
@@ -193,6 +195,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         fingers[id] = floatArrayOf(ev.getX(i), ev.getY(i))
         gestureMaxFingers = maxOf(gestureMaxFingers, fingers.size)
     }
+
+    // Палец, который сейчас стирает (режим «стирать пальцем»)
+    private var fingerErasePointer: Int? = null
 
     private fun startPen(ev: MotionEvent, i: Int, id: Int) {
         // Кнопки пера приложением не используются вообще — только инструмент на панели и ластик-инструмент пера
@@ -256,6 +261,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         }
 
         if (erasing.remove(id) != null && erasing.isEmpty()) finishErasing()
+        if (fingerErasePointer == id) fingerErasePointer = null
 
         if (lassoPointer == id) {
             if (ev.flags and MotionEvent.FLAG_CANCELED != 0) cancelLasso() else finishLasso()
@@ -267,6 +273,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     private fun resetAll() {
         drawing.clear()
         erasing.clear()
+        fingerErasePointer = null
         stylusDown.clear()
         fingers.clear()
         ignored.clear()

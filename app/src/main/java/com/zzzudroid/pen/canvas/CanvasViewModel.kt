@@ -93,7 +93,11 @@ open class CanvasViewModel : ViewModel() {
     var tool by mutableStateOf(CanvasTool.PEN)
     var colorIndex by mutableIntStateOf(0)
     var sizeIndex by mutableIntStateOf(1)
-    var drawWithFinger by mutableStateOf(false)
+    /** Стирать пальцем: палец работает как штриховой ластик (перо при этом рисует по-прежнему). */
+    var eraseWithFinger by mutableStateOf(false)
+
+    /** Страница показана целиком (иначе — вписана по ширине). */
+    var fitWhole by mutableStateOf(false); private set
 
     /** Выделенные лассо штрихи текущей страницы (ссылки на объекты из [strokes]). */
     var selection by mutableStateOf<List<Stroke>>(emptyList()); private set
@@ -247,17 +251,34 @@ open class CanvasViewModel : ViewModel() {
         changed(content = false)
     }
 
-    /** Вписать лист по ширине с полями и прижать к верху. Без страницы — ничего. */
+    /**
+     * Вписать лист с полями: по ширине и прижать к верху, либо (при [fitWhole]) страницу целиком по центру.
+     * Без страницы — ничего.
+     */
     fun fitPage() {
         val spec = pageSpec ?: return
         if (viewWidth == 0) return
         val margin = PAGE_MARGIN_DP * density
-        val scale = (viewWidth - 2 * margin) / spec.width
-        viewport.set(scale, (viewWidth - spec.width * scale) / 2, margin)
+        if (fitWhole && viewHeight > 0) {
+            val scale = minOf((viewWidth - 2 * margin) / spec.width, (viewHeight - 2 * margin) / spec.height)
+            viewport.set(scale, (viewWidth - spec.width * scale) / 2, (viewHeight - spec.height * scale) / 2)
+        } else {
+            val scale = (viewWidth - 2 * margin) / spec.width
+            viewport.set(scale, (viewWidth - spec.width * scale) / 2, margin)
+        }
     }
 
+    /**
+     * Кнопка «вписать»: для страницы переключает «страница целиком» ↔ «по ширине»,
+     * без страницы (холст, доска) — возвращает масштаб 100%.
+     */
     fun resetView() {
-        if (pageSpec != null) fitPage() else viewport.reset()
+        if (pageSpec != null) {
+            fitWhole = !fitWhole
+            fitPage()
+        } else {
+            viewport.reset()
+        }
         changed(content = false)
     }
 

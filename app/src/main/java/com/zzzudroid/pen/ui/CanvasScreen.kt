@@ -3,7 +3,6 @@ package com.zzzudroid.pen.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,20 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -88,36 +86,43 @@ fun CanvasScreen(onBack: () -> Unit, vm: CanvasViewModel = viewModel()) {
     }
 }
 
-/** Панель инструментов холста — общая для «Холста» и тетрадей. */
+/** Размер значка-кнопки панели. */
+private val ToolButtonSize = 44.dp
+
+/**
+ * Панель инструментов холста — общая для «Холста» и тетрадей. Только значки, без слов и прокрутки:
+ * инструменты, цвета, три толщины и переключатель «стирать пальцем».
+ */
 @Composable
 fun CanvasToolbar(vm: CanvasViewModel) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         CanvasTool.entries.forEach { t ->
-            FilterChip(
-                selected = vm.tool == t,
-                onClick = {
+            FilledIconToggleButton(
+                checked = vm.tool == t,
+                onCheckedChange = {
                     // Уход с лассо снимает выделение
                     if (t != CanvasTool.LASSO) vm.clearSelection()
                     vm.tool = t
                 },
-                label = { Text(t.title) },
-            )
+                modifier = Modifier.size(ToolButtonSize),
+            ) {
+                Icon(ToolIcons.of(t), contentDescription = t.title, modifier = Modifier.size(26.dp))
+            }
         }
 
-        VerticalDivider(Modifier.padding(horizontal = 4.dp).size(1.dp, 32.dp))
+        ToolbarDivider()
 
         PALETTE.forEachIndexed { i, argb ->
             val selected = vm.colorIndex == i
             Box(
                 Modifier
-                    .size(32.dp)
+                    .size(30.dp)
                     .clip(CircleShape)
                     .background(Color(argb))
                     .border(
@@ -129,10 +134,10 @@ fun CanvasToolbar(vm: CanvasViewModel) {
             )
         }
 
-        VerticalDivider(Modifier.padding(horizontal = 4.dp).size(1.dp, 32.dp))
+        ToolbarDivider()
 
         // Три толщины: точки разного размера
-        listOf(8.dp, 14.dp, 20.dp).forEachIndexed { i, dot ->
+        listOf(7.dp, 12.dp, 18.dp).forEachIndexed { i, dot ->
             val selected = vm.sizeIndex == i
             Box(
                 Modifier
@@ -150,9 +155,20 @@ fun CanvasToolbar(vm: CanvasViewModel) {
             }
         }
 
-        VerticalDivider(Modifier.padding(horizontal = 4.dp).size(1.dp, 32.dp))
+        ToolbarDivider()
 
-        Text("Рисовать пальцем", style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = vm.drawWithFinger, onCheckedChange = { vm.drawWithFinger = it })
+        // «Стирать пальцем»: включено — палец стирает как ластик; выключено — палец листает, перо рисует
+        FilledIconToggleButton(
+            checked = vm.eraseWithFinger,
+            onCheckedChange = { vm.eraseWithFinger = it },
+            modifier = Modifier.size(ToolButtonSize),
+        ) {
+            Icon(Icons.Outlined.TouchApp, contentDescription = "Стирать пальцем", modifier = Modifier.size(26.dp))
+        }
     }
+}
+
+@Composable
+private fun ToolbarDivider() {
+    VerticalDivider(Modifier.padding(horizontal = 2.dp).size(1.dp, 32.dp))
 }
