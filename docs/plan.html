@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>План доработок</title><style>
+:root{--bg:#fbfaf7;--fg:#1f2328;--muted:#5d646d;--line:#e2ded6;--accent:#b4532a;--code:#f1eee8;--note:#fff4e5}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#17181a;--fg:#e6e3de;--muted:#9a9fa6;--line:#33353a;--accent:#e8875a;--code:#22242a;--note:#2a2218}}
+:root[data-theme="dark"]{--bg:#17181a;--fg:#e6e3de;--muted:#9a9fa6;--line:#33353a;--accent:#e8875a;--code:#22242a;--note:#2a2218}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:2rem;margin:0 0 .25em}
+h2{font-size:1.3rem;margin:2.2em 0 .6em;padding-top:.6em;border-top:1px solid var(--line);color:var(--accent)}
+h1+p{color:var(--muted);margin-top:0}
+table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.93rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.9em}
+pre{background:var(--code);padding:14px;border-radius:8px;overflow-x:auto}
+pre code{padding:0;background:none}
+blockquote{margin:1em 0;padding:10px 16px;background:var(--note);border-left:4px solid var(--accent);border-radius:4px}
+blockquote p{margin:0}
+</style></head><body><main>
+<h1>План доработок</h1>
+<p>Список пунктов по ходу тестирования на планшете. <strong>Правило:</strong> пункты только записываются; реализация — по прямой команде («делай»).
+Статус: <code>[ ]</code> не сделано · <code>[x]</code> сделано.</p>
+<h2>Раздел «Заметки» (список)</h2>
+<ol>
+<li>[x] <strong>Мини-карта доски</strong> — перенести из правого нижнего угла в левый верхний.
+   Сделано раньше, чем появилось правило «сначала план»: коммит <code>1d5decb</code>; ждёт проверки на планшете.</li>
+<li>[ ] <strong>Значок тетради на карточке.</strong> У доски на карточке есть значок доски — сделать такой же значок «тетрадь» у тетрадей,
+   чтобы карточки были однотипными.</li>
+<li>[ ] <strong>Убрать слово «Доска» из подписи карточки</strong>: тип показывает значок, текст «Доска» не нужен.</li>
+<li>[ ] <strong>Формат даты на карточке</strong> — только цифрами через точку, без текста: <code>дд.мм.гггг</code> (сейчас «5 окт. 2026, 19:20»).
+   Предположение: время не показываем (в запросе названы только число, месяц, год).</li>
+<li>[ ] <strong>Размер файла</strong> — показывать сверху на превьюшке (поверх миниатюры).</li>
+</ol>
+<h2>Открытое</h2>
+<ul>
+<li>Подпись «N стр.» у тетрадей оставить или тоже убрать? (в запросе про дату сказано «без текста», про страницы не сказано).</li>
+</ul>
+</main></body></html>
