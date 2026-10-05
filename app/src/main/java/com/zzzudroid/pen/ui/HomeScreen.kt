@@ -178,8 +178,8 @@ private fun Half(
     // Заметки — тёплый бледно-зелёный фон, холсты — бледно-голубой: лёгкие светлые пастельные тона в любой теме,
     // поэтому надписи и значки на них тёмные
     val board = kind == DocKind.BOARD
-    val tint = if (board) androidx.compose.ui.graphics.Color(0xFFE1EFFA) else androidx.compose.ui.graphics.Color(0xFFEFF3CF)
-    val ink = if (board) androidx.compose.ui.graphics.Color(0xFF24394A) else androidx.compose.ui.graphics.Color(0xFF3E4326)
+    val tint = if (board) androidx.compose.ui.graphics.Color(0xFFE1EFFA) else androidx.compose.ui.graphics.Color(0xFFE2F5EA)
+    val ink = if (board) androidx.compose.ui.graphics.Color(0xFF24394A) else androidx.compose.ui.graphics.Color(0xFF2B4A3B)
     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides ink) {
     Column(
         modifier.clip(RoundedCornerShape(20.dp)).background(tint).padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
