@@ -81,6 +81,12 @@ fun HomeScreen(
         drawerContent = {
             ModalDrawerSheet {
                 Text("Pen", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp))
+                NavigationDrawerItem(
+                    label = { Text("Открыть PDF") },
+                    selected = false,
+                    onClick = { scope.launch { drawer.close() }; pickPdf() },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
                 listOf(
                     "Холст" to Routes.CANVAS,
                     "Поиск по рукописи" to Routes.SEARCH,
@@ -123,7 +129,7 @@ fun HomeScreen(
                         kind = DocKind.NOTEBOOK,
                         entries = entries,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        headerAction = { TextButton(onClick = pickPdf) { Text("Открыть PDF") } },
+                        headerAction = null,
                         onOpenList = onOpenList,
                         onCreate = { docs.createNow(false, onOpenDocument) },
                         onOpen = onOpenDocument,
