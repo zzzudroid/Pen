@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -160,21 +161,25 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
         },
         floatingActionButton = {
             if (hasAccess) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Три кнопки одной ширины: столбец по самой длинной подписи, каждая кнопка растянута на всю ширину столбца
+                Column(Modifier.width(IntrinsicSize.Max), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ExtendedFloatingActionButton(
                         onClick = { if (!importing) pickPdf.launch(arrayOf("application/pdf")) },
+                        modifier = Modifier.fillMaxWidth(),
                         icon = { Icon(Icons.Outlined.PictureAsPdf, contentDescription = null) },
                         text = { Text("Открыть PDF") },
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     )
                     ExtendedFloatingActionButton(
                         onClick = { creatingBoard = true },
+                        modifier = Modifier.fillMaxWidth(),
                         icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) },
                         text = { Text("Новая доска") },
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     )
                     ExtendedFloatingActionButton(
                         onClick = { creating = true },
+                        modifier = Modifier.fillMaxWidth(),
                         icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                         text = { Text("Новая тетрадь") },
                     )
@@ -313,68 +318,6 @@ private fun AccessRequest(onGrant: () -> Unit) {
     }
 }
 
-@Composable
-private fun NotebookCard(
-    entry: NotebookEntry,
-    onOpen: () -> Unit,
-    onSharePdf: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val thumb by produceState<Bitmap?>(null, entry.file, entry.meta?.modified) {
-        value = withContext(Dispatchers.IO) { NotebookFormat.readThumbnail(entry.file) }
-    }
-    var menu by remember { mutableStateOf(false) }
-
-    Card(onClick = onOpen) {
-        Box(
-            Modifier.fillMaxWidth().aspectRatio(210f / 297f).background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            thumb?.let {
-                Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-            }
-            if (entry.meta == null) Text("Файл повреждён", color = MaterialTheme.colorScheme.error)
-        }
-        Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Значок доски — чтобы отличать её от тетрадей
-                    if (entry.meta?.isBoard == true) {
-                        Icon(
-                            Icons.Outlined.Dashboard,
-                            contentDescription = "Доска",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    Text(entry.meta?.title ?: entry.id, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                }
-                Text(
-                    entry.meta?.let {
-                        val what = if (it.isBoard) "Доска" else "${it.pageIds.size} стр."
-                        "$what · ${formatDate(it.modified)}"
-                    } ?: (entry.error ?: ""),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Действия") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (entry.meta != null) {
-                        DropdownMenuItem(text = { Text("Поделиться PDF") }, onClick = { menu = false; onSharePdf() })
-                        DropdownMenuItem(text = { Text("Переименовать") }, onClick = { menu = false; onRename() })
-                    }
-                    DropdownMenuItem(text = { Text("Удалить") }, onClick = { menu = false; onDelete() })
-                }
-            }
-        }
-    }
-}
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -412,8 +355,6 @@ private fun TitleDialog(title: String, initial: String, confirm: String, onDismi
     )
 }
 
-private fun formatDate(millis: Long): String =
-    SimpleDateFormat("d MMM yyyy, HH:mm", Locale("ru")).format(Date(millis))
 
 /** Название тетради из имени выбранного PDF без расширения; запасной вариант — «PDF». */
 private fun pdfTitle(context: Context, uri: Uri): String {
