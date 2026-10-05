@@ -21,7 +21,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -33,6 +40,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -59,18 +68,43 @@ fun HomeScreen(
     val docs = rememberDocumentsState(snackbar)
     val pickPdf = rememberPdfPicker(docs, onOpenDocument)
 
+    // Служебные разделы — в левой выезжающей панели, чтобы не светились в шапке
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    fun open(route: String) {
+        scope.launch { drawer.close() }
+        onNavigate(route)
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        drawerContent = {
+            ModalDrawerSheet {
+                Text("Pen", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp))
+                listOf(
+                    "Холст" to Routes.CANVAS,
+                    "Поиск по рукописи" to Routes.SEARCH,
+                    "Диагностика пера" to Routes.DIAGNOSTICS,
+                    "О программе" to Routes.ABOUT,
+                ).forEach { (title, route) ->
+                    NavigationDrawerItem(
+                        label = { Text(title) },
+                        selected = false,
+                        onClick = { open(route) },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+            }
+        },
+    ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Pen") },
-                actions = {
-                    // Четыре служебных пункта — простым текстом; при нехватке места ряд прокручивается, но не переносится
-                    Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        TextButton(onClick = { onNavigate(Routes.ABOUT) }) { Text("О программе") }
-                        TextButton(onClick = { onNavigate(Routes.DIAGNOSTICS) }) { Text("Диагностика пера") }
-                        TextButton(onClick = { onNavigate(Routes.CANVAS) }) { Text("Холст") }
-                        TextButton(onClick = { onNavigate(Routes.SEARCH) }) { Text("Поиск по рукописи") }
+                navigationIcon = {
+                    IconButton(onClick = { scope.launch { drawer.open() } }) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Меню")
                     }
                 },
             )
@@ -113,6 +147,7 @@ fun HomeScreen(
                 }
             }
         }
+    }
     }
 
     DocumentDialogs(docs)
