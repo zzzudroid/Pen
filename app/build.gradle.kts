@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.androidx.ink.geometry)
     implementation(libs.androidx.ink.rendering)
     implementation(libs.androidx.ink.strokes)
+    implementation(libs.androidx.ink.storage)
     implementation(libs.androidx.input.motionprediction)
     debugImplementation(libs.androidx.ui.tooling)
 

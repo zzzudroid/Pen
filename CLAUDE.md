@@ -35,6 +35,11 @@ adb logcat -s PenDiag
 - `canvas/` — холст: `DrawingSurface` (слой готовых штрихов + `InProgressStrokesView`, вся маршрутизация
   указателей, жесты, ластик), `CanvasViewModel` (штрихи в мировых координатах, история, вид, кисть),
   `Viewport` и `History` — чистый Kotlin с тестами. `StylusPresence` получает hover из `MainActivity`.
+- `CanvasViewModel` — со страницами: `canvas/Page.kt` (`PageState` — штрихи и история страницы, `PageSpec`,
+  `PageTemplate`), `canvas/PageRenderer.kt` (стол, лист и шаблон в мировых координатах; A4 = 1050×1485, 5 ед./мм).
+- `notes/` — тетради: `NotebookStore` (Documents/Pen, уникальные имена, атомарная запись, rename с учётом
+  регистронезависимости /sdcard), `NotebookFormat` (формат `.pen` v1), `NotebookViewModel` (наследник
+  `CanvasViewModel`, автосохранение в `NotebookStore.saveScope` под `writeLock`), `FileNames` (чистый Kotlin, тесты).
 - API androidx.ink сверять по фактическим классам библиотеки (javap), документация к alpha-версиям расходится с 1.0.
 - `BuildConfig.BUILD_TIME / GIT_HASH / GIT_DIRTY` — для экрана «О программе»; генерация BuildConfig
   никогда не считается up-to-date.

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 private data class Section(val title: String, val subtitle: String, val icon: ImageVector, val route: String)
 
 private val sections = listOf(
+    Section("Заметки", "Тетради со страницами, шаблоны, автосохранение", Icons.AutoMirrored.Outlined.MenuBook, Routes.NOTES),
     Section("Холст", "Рисование пером: кисти, ластик, отмена, масштаб", Icons.Outlined.Gesture, Routes.CANVAS),
     Section("Диагностика пера", "Давление, наклон, кнопки, hover, частота событий", Icons.Outlined.Draw, Routes.DIAGNOSTICS),
     Section("О программе", "Версия и время сборки", Icons.Outlined.Info, Routes.ABOUT),

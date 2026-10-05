@@ -27,6 +27,7 @@ androidx-ink-authoring = { group = "androidx.ink", name = "ink-authoring", versi
 androidx-ink-brush = { group = "androidx.ink", name = "ink-brush", version.ref = "ink" }
 androidx-ink-geometry = { group = "androidx.ink", name = "ink-geometry", version.ref = "ink" }
 androidx-ink-rendering = { group = "androidx.ink", name = "ink-rendering", version.ref = "ink" }
+androidx-ink-storage = { group = "androidx.ink", name = "ink-storage", version.ref = "ink" }
 androidx-ink-strokes = { group = "androidx.ink", name = "ink-strokes", version.ref = "ink" }
 androidx-input-motionprediction = { group = "androidx.input", name = "input-motionprediction", version.ref = "motionPrediction" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

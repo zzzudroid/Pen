@@ -184,6 +184,18 @@ blockquote p{margin:0}
 <li>Каждое изменение — команда (<code>AddStroke</code>, <code>Erase</code>, <code>Transform</code>…) → бесконечный undo/redo и в будущем синхронизация через журнал операций.</li>
 <li>Файл документа: <code>document.pen</code> = zip { <code>meta.json</code>, <code>pages/*.pb</code>, <code>assets/*</code>, <code>thumb.png</code> } — легко бэкапить и переносить.</li>
 </ul>
+<h3>Формат <code>.pen</code> v1 (реализовано)</h3>
+<p>Единицы мира — 5 ед./мм; страница A4 (книжная) = 1050 × 1485.</p>
+<pre><code>&lt;название&gt;.pen  (zip, Documents/Pen/)
+ ├─ meta.json            — formatVersion, title, template (blank|lined|grid|dots),
+ │                         pageWidth, pageHeight, unitsPerMm, created, modified, pages: [id…]
+ ├─ pages/&lt;id&gt;.strokes   — штрихи страницы (бинарный, DataOutputStream)
+ └─ thumb.png            — миниатюра первой страницы, 300 px по ширине
+</code></pre>
+<p>Файл <code>.strokes</code>: <code>int</code> число штрихов; на каждый штрих — <code>UTF</code> id инструмента (<code>pen</code> / <code>marker</code> / <code>highlighter</code>),
+<code>int</code> цвет ARGB, <code>float</code> размер, <code>float</code> epsilon, <code>int</code> длина + байты <code>StrokeInputBatch</code> (<code>androidx.ink.storage</code>).
+Кисть хранится своими полями, а не сериализованной <code>BrushFamily</code>, — формат не зависит от внутреннего устройства
+стоковых кистей Ink. Запись атомарная: <code>&lt;имя&gt;.pen.tmp</code> → <code>fsync</code> → переименование.</p>
 <h2>6. Ввод и поведение пера</h2>
 <ol>
 <li><strong>Разделение инструментов:</strong> <code>TOOL_TYPE_STYLUS</code> рисует, <code>TOOL_TYPE_FINGER</code> — пан/зум/жесты, <code>TOOL_TYPE_ERASER</code> (если перо его отдаёт) — ластик.</li>
@@ -244,17 +256,17 @@ blockquote p{margin:0}
 <tr>
 <td><strong>0. Диагностика пера</strong></td>
 <td>Экран, выводящий все поля <code>MotionEvent</code> (давление, наклон, кнопки, hover, частота событий)</td>
-<td>Реальные возможности Focus Pen на твоём Pad 7 — основа для всех решений ниже</td>
+<td>Реальные возможности Focus Pen на твоём Pad 7 — основа для всех решений ниже. <em>Код готов, ждёт проверки на устройстве</em></td>
 </tr>
 <tr>
 <td><strong>1. Ядро холста</strong></td>
 <td>Low-latency рисование, Ink-кисти, ластик, undo, зум/пан, palm rejection</td>
-<td>Можно рисовать и это приятно</td>
+<td>Можно рисовать и это приятно. <em>Код готов, ждёт проверки на устройстве</em></td>
 </tr>
 <tr>
 <td><strong>2. Заметки</strong></td>
 <td>Тетради, страницы, шаблоны, сохранение, лассо</td>
-<td>Первый полезный режим</td>
+<td>Первый полезный режим. <em>Код готов, ждёт проверки на устройстве</em> (лассо — отдельным change)</td>
 </tr>
 <tr>
 <td><strong>3. Доступ с ПК</strong></td>

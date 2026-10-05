@@ -1,5 +1,6 @@
 package com.zzzudroid.pen.ui
 
+import android.net.Uri
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -14,6 +15,10 @@ import com.zzzudroid.pen.diag.DiagnosticsViewModel
 // Маршруты навигации
 object Routes {
     const val HOME = "home"
+    const val NOTES = "notes"
+    const val NOTE = "note/{id}"
+
+    fun note(id: String) = "note/" + Uri.encode(id)
     const val CANVAS = "canvas"
     const val DIAGNOSTICS = "diagnostics"
     const val ABOUT = "about"
@@ -30,6 +35,12 @@ fun AppRoot(diagnostics: DiagnosticsViewModel) {
         NavHost(navController = nav, startDestination = Routes.HOME) {
             composable(Routes.HOME) {
                 HomeScreen(onOpen = { route -> nav.navigate(route) })
+            }
+            composable(Routes.NOTES) {
+                NotesListScreen(onBack = { nav.popBackStack() }, onOpen = { id -> nav.navigate(Routes.note(id)) })
+            }
+            composable(Routes.NOTE) {
+                NoteEditorScreen(onBack = { nav.popBackStack() })
             }
             composable(Routes.CANVAS) {
                 CanvasScreen(onBack = { nav.popBackStack() })

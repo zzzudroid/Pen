@@ -70,6 +70,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     /** Модель изменилась извне (отмена, повтор, сброс вида). */
     fun refresh() = strokesLayer.invalidate()
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && h > 0) vm.onViewSize(w, h, density)
+    }
+
     // Все касания обрабатываем сами, дочерние View их не получают
     override fun onInterceptTouchEvent(ev: MotionEvent) = true
 
@@ -139,6 +144,12 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     }
 
     private fun startPen(ev: MotionEvent, i: Int, id: Int) {
+        // На странице с границами штрих начинается только на листе
+        val spec = vm.pageSpec
+        if (spec != null) {
+            val w = worldPoint(ev.getX(i), ev.getY(i))
+            if (!spec.contains(w[0], w[1])) return
+        }
         val eraser = ev.getToolType(i) == MotionEvent.TOOL_TYPE_ERASER ||
             (ev.buttonState and STYLUS_ERASER_BUTTONS) != 0
         val brush = vm.brush(density, eraserOverride = eraser)
@@ -266,13 +277,22 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         erasedNow.clear()
     }
 
-    /** Слой готовых штрихов: фон и все штрихи модели с матрицей вида. */
+    /** Слой готовых штрихов: фон (стол, лист, шаблон) и все штрихи текущей страницы. */
     private inner class StrokesLayer(context: Context) : View(context) {
         private val matrix = Matrix()
 
         override fun onDraw(canvas: Canvas) {
-            canvas.drawColor(BACKGROUND)
             vm.viewMatrix(matrix)
+            val spec = vm.pageSpec
+            if (spec == null) {
+                canvas.drawColor(BACKGROUND)
+            } else {
+                canvas.drawColor(DESK)
+                canvas.save()
+                canvas.concat(matrix)
+                drawPage(canvas, spec, vm.viewport.scale)
+                canvas.restore()
+            }
             for (s in vm.strokes) renderer.draw(canvas, s, matrix)
         }
     }
@@ -286,5 +306,6 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         const val TAP_MAX_TRAVEL_DP = 24f
         const val MIN_PINCH_PX = 10f
         val BACKGROUND = Color.rgb(0xFB, 0xFA, 0xF7)
+        val DESK = Color.rgb(0xE4, 0xE1, 0xDA)
     }
 }

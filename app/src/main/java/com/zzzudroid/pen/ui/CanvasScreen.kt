@@ -76,7 +76,7 @@ fun CanvasScreen(onBack: () -> Unit, vm: CanvasViewModel = viewModel()) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            Toolbar(vm)
+            CanvasToolbar(vm)
             AndroidView(
                 factory = { ctx -> DrawingSurface(ctx, vm) },
                 // Чтение version подписывает перерисовку холста на изменения модели
@@ -87,8 +87,9 @@ fun CanvasScreen(onBack: () -> Unit, vm: CanvasViewModel = viewModel()) {
     }
 }
 
+/** Панель инструментов холста — общая для «Холста» и тетрадей. */
 @Composable
-private fun Toolbar(vm: CanvasViewModel) {
+fun CanvasToolbar(vm: CanvasViewModel) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
