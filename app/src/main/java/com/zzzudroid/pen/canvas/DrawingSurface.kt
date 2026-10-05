@@ -54,6 +54,45 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     // Рисующие указатели: id указателя → id штриха в InProgressStrokesView
     private val drawing = HashMap<Int, InProgressStrokeId>()
 
+    // Штрихи со сглаживанием: id штриха Ink → сила; после отрыва пера они сглаживаются ещё раз (Beautify)
+    private val beautifyLevels = HashMap<InProgressStrokeId, Int>()
+
+    /** Тот же штрих с путём, сглаженным [Beautify]; давление, наклон и время переносятся интерполяцией. При любой неудаче — как есть. */
+    private fun beautified(stroke: Stroke, level: Int): Stroke {
+        try {
+            val inputs = stroke.inputs
+            val n = inputs.size
+            if (n < 4) return stroke
+            val (xs, ys) = StrokeOps.points(stroke)
+            val path = Beautify.smooth(xs, ys, level) ?: return stroke
+            val a = StrokeInput()
+            val b = StrokeInput()
+            val out = MutableStrokeInputBatch()
+            val p = StrokeInput()
+            for (k in path.xs.indices) {
+                val f = path.source[k].coerceIn(0f, (n - 1).toFloat())
+                val i0 = f.toInt().coerceAtMost(n - 1)
+                val i1 = (i0 + 1).coerceAtMost(n - 1)
+                val t = f - i0
+                inputs.populate(i0, a)
+                inputs.populate(i1, b)
+                fun mix(u: Float, v: Float) = if (u < 0f || v < 0f) (if (t < 0.5f) u else v) else u + (v - u) * t
+                p.update(
+                    path.xs[k], path.ys[k],
+                    (a.elapsedTimeMillis + (b.elapsedTimeMillis - a.elapsedTimeMillis) * t).toLong(),
+                    a.toolType, a.strokeUnitLengthCm,
+                    mix(a.pressure, b.pressure), mix(a.tiltRadians, b.tiltRadians),
+                    if (t < 0.5f) a.orientationRadians else b.orientationRadians,
+                )
+                out.add(p)
+            }
+            return Stroke(stroke.brush, out)
+        } catch (e: Exception) {
+            android.util.Log.w("PenDraw", "Сглаживание штриха не удалось, оставляем как есть", e)
+            return stroke
+        }
+    }
+
     // Сглаживание штриха: id указателя → фильтр (только пока сглаживание включено)
     private val smoothers = HashMap<Int, SmoothedStroke>()
 
@@ -144,7 +183,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         inProgress.addFinishedStrokesListener(object : InProgressStrokesFinishedListener {
             override fun onStrokesFinished(strokes: Map<InProgressStrokeId, Stroke>) {
                 // Сначала штрих попадает в нижний слой, и только потом убирается из верхнего — без мигания
-                strokes.values.forEach { vm.addStroke(it) }
+                strokes.forEach { (id, stroke) ->
+                    // Штрих, нарисованный со сглаживанием, после отрыва пера «подтягивается»: сильное сглаживание без отставания
+                    val level = beautifyLevels.remove(id)
+                    vm.addStroke(if (level != null) beautified(stroke, level) else stroke)
+                }
                 strokesLayer.invalidate()
                 inProgress.removeFinishedStrokes(strokes.keys)
             }
@@ -294,10 +337,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             if (level > 0) {
                 // Сглаженный штрих: точки идут через фильтр, а не прямо из MotionEvent
                 vm.viewMatrix(viewMatrix)
-                val sm = SmoothedStroke(level, ev.eventTime)
+                val sm = SmoothedStroke(level.coerceAtMost(2), ev.eventTime)
                 val first = sm.first(ev, i, worldPoint(ev.getX(i), ev.getY(i)))
                 drawing[id] = inProgress.startStroke(first, brush, Matrix(viewMatrix))
                 smoothers[id] = sm
+                beautifyLevels[drawing.getValue(id)] = level
             } else {
                 vm.viewMatrix(viewMatrix).invert(worldMatrix)
                 drawing[id] = inProgress.startStroke(ev, id, brush, worldMatrix)
