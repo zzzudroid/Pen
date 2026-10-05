@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.TouchApp
@@ -162,6 +163,13 @@ fun CanvasToolbar(vm: CanvasViewModel) {
 
         ToolbarDivider()
 
+        FilledIconToggleButton(
+            checked = com.zzzudroid.pen.settings.AppSettings.smoothingOn,
+            onCheckedChange = { com.zzzudroid.pen.settings.AppSettings.putSmoothingOn(it) },
+            modifier = Modifier.size(ToolButtonSize),
+        ) {
+            Icon(Icons.Outlined.AutoFixHigh, contentDescription = "Сглаживание пера", modifier = Modifier.size(26.dp))
+        }
         // «Стирать пальцем»: включено — палец стирает как ластик; выключено — палец листает, перо рисует
         FilledIconToggleButton(
             checked = vm.eraseWithFinger,

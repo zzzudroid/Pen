@@ -70,7 +70,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             val pressure = if (h < 0) ev.getPressure(i) else ev.getHistoricalPressure(i, h)
             val orientation = if (h < 0) ev.getOrientation(i) else ev.getHistoricalOrientation(i, h)
             val tilt = if (h < 0) ev.getAxisValue(MotionEvent.AXIS_TILT, i) else ev.getHistoricalAxisValue(MotionEvent.AXIS_TILT, i, h)
-            return StrokeInput.create(x, y, t, InputToolType.STYLUS, WORLD_UNIT_CM, pressure, tilt, orientation)
+            // Ink строг к диапазонам: азимут Android −π…π, Ink ждёт 0…2π
+            return StrokeInput.create(
+                x, y, t, InputToolType.STYLUS, WORLD_UNIT_CM,
+                InkInputRanges.pressure(pressure), InkInputRanges.tilt(tilt), InkInputRanges.orientation(orientation),
+            )
         }
 
         fun first(ev: MotionEvent, i: Int, w: FloatArray): StrokeInput {
@@ -308,7 +312,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                 val i = ev.findPointerIndex(pid)
                 if (i < 0) continue
                 val sm = smoothers[pid]
-                if (sm != null) inProgress.addToStroke(sm.batch(ev, i), strokeId, MutableStrokeInputBatch())
+                if (sm != null) {
+                    try {
+                        inProgress.addToStroke(sm.batch(ev, i), strokeId, MutableStrokeInputBatch())
+                    } catch (e: IllegalArgumentException) {
+                        android.util.Log.w("PenDraw", "Точка штриха отклонена Ink", e) // пропускаем точку, штрих продолжается
+                    }
+                }
                 else inProgress.addToStroke(ev, pid, strokeId, predicted)
             }
             predicted?.recycle()

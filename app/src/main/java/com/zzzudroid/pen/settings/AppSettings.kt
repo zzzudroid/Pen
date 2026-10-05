@@ -35,8 +35,14 @@ object AppSettings {
     /** Не гасить экран, пока открыт редактор. */
     var keepScreenOn by mutableStateOf(false); private set
 
-    /** Сглаживание пера: 0 — выкл, 1…3 — лёгкое, среднее, сильное. */
-    var smoothing by mutableStateOf(1); private set
+    /** Сглаживание пера включено (кнопка на панели инструментов); по умолчанию выключено. */
+    var smoothingOn by mutableStateOf(false); private set
+
+    /** Сила сглаживания: 1 — лёгкое, 2 — среднее, 3 — сильное. */
+    var smoothingStrength by mutableStateOf(2); private set
+
+    /** Действующий уровень сглаживания для пера: 0, если выключено. */
+    val smoothing: Int get() = if (smoothingOn) smoothingStrength else 0
 
     /** Цвет пера по умолчанию — номер в палитре. */
     var defaultColor by mutableStateOf(0); private set
@@ -54,7 +60,8 @@ object AppSettings {
         boardMinimap = p.getBoolean("boardMinimap", true)
         linksByTap = p.getBoolean("linksByTap", true)
         keepScreenOn = p.getBoolean("keepScreenOn", false)
-        smoothing = p.getInt("smoothing", 1).coerceIn(0, 3)
+        smoothingOn = p.getBoolean("smoothingOn", false)
+        smoothingStrength = p.getInt("smoothingStrength", 2).coerceIn(1, 3)
         defaultColor = p.getInt("defaultColor", 0)
         defaultSize = p.getInt("defaultSize", 1).coerceIn(0, 2)
     }
@@ -70,7 +77,8 @@ object AppSettings {
     fun putBoardMinimap(v: Boolean) { boardMinimap = v; save { putBoolean("boardMinimap", v) } }
     fun putLinksByTap(v: Boolean) { linksByTap = v; save { putBoolean("linksByTap", v) } }
     fun putKeepScreenOn(v: Boolean) { keepScreenOn = v; save { putBoolean("keepScreenOn", v) } }
-    fun putSmoothing(v: Int) { smoothing = v; save { putInt("smoothing", v) } }
+    fun putSmoothingOn(v: Boolean) { smoothingOn = v; save { putBoolean("smoothingOn", v) } }
+    fun putSmoothingStrength(v: Int) { smoothingStrength = v; save { putInt("smoothingStrength", v) } }
     fun putDefaultColor(v: Int) { defaultColor = v; save { putInt("defaultColor", v) } }
     fun putDefaultSize(v: Int) { defaultSize = v; save { putInt("defaultSize", v) } }
 }

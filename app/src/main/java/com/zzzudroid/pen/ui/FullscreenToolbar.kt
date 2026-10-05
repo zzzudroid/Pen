@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.FullscreenExit
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.TouchApp
@@ -87,6 +88,13 @@ fun FullscreenToolbar(vm: CanvasViewModel, onExit: () -> Unit, modifier: Modifie
                 BarDivider()
                 ColorMenuButton(vm)
                 SizeMenuButton(vm)
+                FilledIconToggleButton(
+                    checked = com.zzzudroid.pen.settings.AppSettings.smoothingOn,
+                    onCheckedChange = { com.zzzudroid.pen.settings.AppSettings.putSmoothingOn(it) },
+                    modifier = Modifier.size(ButtonSize),
+                ) {
+                    Icon(Icons.Outlined.AutoFixHigh, contentDescription = "Сглаживание пера", modifier = Modifier.size(24.dp))
+                }
                 FilledIconToggleButton(
                     checked = vm.eraseWithFinger,
                     onCheckedChange = { vm.eraseWithFinger = it },
