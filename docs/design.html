@@ -190,6 +190,7 @@ blockquote p{margin:0}
  ├─ meta.json            — formatVersion, title, template (blank|lined|grid|dots),
  │                         pageWidth, pageHeight, unitsPerMm, created, modified, pages: [id…],
  │                         pageInfo: [{id, width, height, template, pdfPage?}], hasPdfSource   (v2)
+ │                         kind: notebook|board, boardView: {scale, tx, ty}   (доска: одна страница 0×0)
  ├─ pages/&lt;id&gt;.strokes   — штрихи страницы (бинарный, DataOutputStream)
  ├─ source.pdf           — исходный PDF для тетрадей-разметок (v2, необязателен)
  └─ thumb.png            — миниатюра первой страницы, 300 px по ширине
@@ -283,7 +284,7 @@ blockquote p{margin:0}
 <tr>
 <td><strong>5. Доска</strong></td>
 <td>Бесконечный холст, тайлы, мини-карта</td>
-<td>Третий режим</td>
+<td>Третий режим. <em>Код готов (change <code>board</code>, без тайлового кэша), ждёт проверки на устройстве</em></td>
 </tr>
 <tr>
 <td><strong>6. Рисование</strong></td>

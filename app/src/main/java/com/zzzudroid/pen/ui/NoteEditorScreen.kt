@@ -121,7 +121,10 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                         Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Повторить")
                     }
                     IconButton(onClick = vm::resetView) {
-                        Icon(Icons.Outlined.FitScreen, contentDescription = "Вписать страницу")
+                        Icon(
+                            Icons.Outlined.FitScreen,
+                            contentDescription = if (vm.isBoard) "Вернуться в начало" else "Вписать страницу",
+                        )
                     }
                 },
             )
@@ -141,6 +144,9 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                     AndroidView(
                         factory = { ctx ->
                             DrawingSurface(ctx, vm).also { surface ->
+                                // Доске — точечная сетка и мини-карта для навигации
+                                surface.showGrid = vm.isBoard
+                                surface.showMinimap = vm.isBoard
                                 // Подложка страницы из исходного PDF; актуальные страница и источник читаются при каждой отрисовке
                                 surface.pageBackground = { canvas, spec, scale, invalidate ->
                                     drawPdfBackground(canvas, spec, scale, vm.pdfSource, vm.page.pdfPage, invalidate)
@@ -151,6 +157,8 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                         update = { surface -> vm.version; surface.refresh() },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
+                    // У доски нет страниц — панель страниц не нужна
+                    if (!vm.isBoard) {
                     HorizontalDivider()
                     PageBar(
                         index = vm.pageIndex,
@@ -160,6 +168,7 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                         onAdd = vm::addPageAfterCurrent,
                         onDelete = { confirmDeletePage = true },
                     )
+                    }
                 }
             }
         }

@@ -24,6 +24,7 @@ import androidx.ink.strokes.Stroke
 import androidx.input.motionprediction.MotionEventPredictor
 import java.util.Collections
 import java.util.IdentityHashMap
+import kotlin.math.floor
 import kotlin.math.hypot
 
 /**
@@ -41,6 +42,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     private val strokesLayer = StrokesLayer(context)
     private val inProgress = InProgressStrokesView(context)
     private val overlay = SelectionOverlay(context)
+    private val minimap = MinimapLayer(context)
     private val predictor = MotionEventPredictor.newInstance(this)
 
     // Рисующие указатели: id указателя → id штриха в InProgressStrokesView
@@ -81,6 +83,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         addView(strokesLayer, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(inProgress, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(overlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(minimap, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         inProgress.addFinishedStrokesListener(object : InProgressStrokesFinishedListener {
             override fun onStrokesFinished(strokes: Map<InProgressStrokeId, Stroke>) {
                 // Сначала штрих попадает в нижний слой, и только потом убирается из верхнего — без мигания
@@ -101,9 +104,18 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
      */
     var pageBackground: ((canvas: Canvas, spec: PageSpec, scale: Float, invalidate: () -> Unit) -> Boolean)? = null
 
+    /** Точечная сетка на безграничном холсте (доска). */
+    var showGrid = false
+        set(value) { field = value; strokesLayer.invalidate() }
+
+    /** Мини-карта в правом нижнем углу (доска). */
+    var showMinimap = false
+        set(value) { field = value; minimap.invalidate() }
+
     private fun invalidateLayers() {
         strokesLayer.invalidate()
         overlay.invalidate()
+        minimap.invalidate()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -116,6 +128,8 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(ev: MotionEvent): Boolean {
+        // Касание мини-карты разбирается раньше пера и пальцев и забирает весь жест
+        if (minimap.handleTouch(ev)) return true
         predictor.record(ev)
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> onPointerDown(ev, ev.actionIndex)
@@ -428,6 +442,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             val spec = vm.pageSpec
             if (spec == null) {
                 canvas.drawColor(BACKGROUND)
+                if (showGrid) drawGrid(canvas)
             } else {
                 canvas.drawColor(DESK)
                 canvas.save()
@@ -440,6 +455,209 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             // Во время перетаскивания выделенные штрихи рисует оверлей
             val hidden = if (preview != null) previewSet else null
             for (s in vm.strokes) if (hidden == null || s !in hidden) renderer.draw(canvas, s, matrix)
+        }
+    }
+
+    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(0xA9, 0xB4, 0xC2)
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = 2.4f
+    }
+    private var gridPoints = FloatArray(0)
+
+    /** Точечная сетка видимой области: шаг 5 мм, удваивается, пока на экране не станет >= 12 dp. */
+    private fun drawGrid(canvas: Canvas) {
+        val vp = vm.viewport
+        var step = GRID_STEP_WORLD
+        while (step * vp.scale < GRID_MIN_STEP_DP * density) step *= 2
+        val left = floor(vp.screenToWorldX(0f) / step) * step
+        val top = floor(vp.screenToWorldY(0f) / step) * step
+        val right = vp.screenToWorldX(width.toFloat())
+        val bottom = vp.screenToWorldY(height.toFloat())
+        val cols = ((right - left) / step).toInt() + 2
+        val rows = ((bottom - top) / step).toInt() + 2
+        val need = cols * rows * 2
+        if (gridPoints.size < need) gridPoints = FloatArray(need)
+        var n = 0
+        for (r in 0 until rows) {
+            val sy = vp.worldToScreenY(top + r * step)
+            for (c in 0 until cols) {
+                gridPoints[n++] = vp.worldToScreenX(left + c * step)
+                gridPoints[n++] = sy
+            }
+        }
+        // drawPoints с круглым концом — быстрее тысяч drawCircle
+        canvas.drawPoints(gridPoints, 0, n, gridPaint)
+    }
+
+    /**
+     * Мини-карта: содержимое и текущий вид. Касание или перетаскивание переносит центр вида;
+     * на время жеста раскладка карты замораживается, чтобы она не «прыгала» вслед за видом.
+     */
+    private inner class MinimapLayer(context: Context) : View(context) {
+        private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(0xD8, 0xFF, 0xFF, 0xFF) }
+        private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.rgb(0xC8, 0xC4, 0xBC)
+            strokeWidth = 1f * density
+        }
+        private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.rgb(0x44, 0x44, 0x44)
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val viewPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = SELECTION_COLOR
+            strokeWidth = 1.5f * density
+        }
+        private val clip = Path()
+        private val m = Matrix()
+
+        // Кэш содержимого по версии модели
+        private var cachedVersion = -1
+        private var cachedStrokes: List<Stroke>? = null
+        private var contentBounds: Bounds? = null
+        private val contentPath = Path()
+
+        // Замороженная раскладка на время жеста: [wl, wt, k, ox, oy]
+        private var pointer: Int? = null
+        private var frozen: FloatArray? = null
+
+        private fun rect(): Bounds {
+            val w = MINIMAP_W_DP * density
+            val h = MINIMAP_H_DP * density
+            val margin = MINIMAP_MARGIN_DP * density
+            return Bounds(width - margin - w, height - margin - h, width - margin, height - margin)
+        }
+
+        private fun refreshContent() {
+            if (cachedVersion == vm.version && cachedStrokes === vm.strokes) return
+            cachedVersion = vm.version
+            cachedStrokes = vm.strokes
+            val strokes = vm.strokes
+            contentBounds = StrokeOps.bounds(strokes)
+            contentPath.reset()
+            if (strokes.size > MINIMAP_DETAIL_LIMIT) {
+                // Много штрихов — только их рамки
+                for (s in strokes) StrokeOps.bounds(listOf(s))?.let {
+                    contentPath.addRect(it.left, it.top, it.right, it.bottom, Path.Direction.CW)
+                }
+            } else {
+                // Штрихи ломаными по каждой 4-й точке
+                for (s in strokes) {
+                    val (xs, ys) = StrokeOps.points(s)
+                    if (xs.isEmpty()) continue
+                    contentPath.moveTo(xs[0], ys[0])
+                    var k = 4
+                    while (k < xs.size) {
+                        contentPath.lineTo(xs[k], ys[k])
+                        k += 4
+                    }
+                    contentPath.lineTo(xs.last(), ys.last())
+                }
+            }
+        }
+
+        /** Видимая область в мировых координатах. */
+        private fun viewWorld(): Bounds {
+            val vp = vm.viewport
+            return Bounds(
+                vp.screenToWorldX(0f), vp.screenToWorldY(0f),
+                vp.screenToWorldX(width.toFloat()), vp.screenToWorldY(height.toFloat()),
+            )
+        }
+
+        /** Раскладка [wl, wt, k, ox, oy]: экран карты = rect.left + ox + (x - wl) * k. */
+        private fun layout(content: Bounds): FloatArray {
+            val r = rect()
+            var world = content.union(viewWorld())
+            world = world.inflate(maxOf(world.width, world.height) * 0.05f)
+            val k = minOf(r.width / world.width, r.height / world.height)
+            val ox = (r.width - world.width * k) / 2
+            val oy = (r.height - world.height * k) / 2
+            return floatArrayOf(world.left, world.top, k, ox, oy)
+        }
+
+        private fun visible(): Boolean {
+            if (!showMinimap || width == 0) return false
+            refreshContent()
+            return contentBounds != null
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            if (!visible()) return
+            val content = contentBounds ?: return
+            val r = rect()
+            val l = frozen ?: layout(content)
+            val radius = 8f * density
+            canvas.drawRoundRect(r.left, r.top, r.right, r.bottom, radius, radius, bg)
+            canvas.save()
+            clip.reset()
+            clip.addRoundRect(r.left, r.top, r.right, r.bottom, radius, radius, Path.Direction.CW)
+            canvas.clipPath(clip)
+            m.setTranslate(-l[0], -l[1])
+            m.postScale(l[2], l[2])
+            m.postTranslate(r.left + l[3], r.top + l[4])
+            canvas.save()
+            canvas.concat(m)
+            ink.strokeWidth = 1.2f * density / l[2]
+            canvas.drawPath(contentPath, ink)
+            canvas.restore()
+            val v = viewWorld()
+            val x0 = r.left + l[3]
+            val y0 = r.top + l[4]
+            canvas.drawRect(
+                x0 + (v.left - l[0]) * l[2], y0 + (v.top - l[1]) * l[2],
+                x0 + (v.right - l[0]) * l[2], y0 + (v.bottom - l[1]) * l[2],
+                viewPaint,
+            )
+            canvas.restore()
+            canvas.drawRoundRect(r.left, r.top, r.right, r.bottom, radius, radius, border)
+        }
+
+        /** Разобрать касание; true — касание принадлежит мини-карте. */
+        fun handleTouch(ev: MotionEvent): Boolean {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (!visible()) return false
+                    val x = ev.getX(0)
+                    val y = ev.getY(0)
+                    if (!rect().contains(x, y)) return false
+                    pointer = ev.getPointerId(0)
+                    frozen = layout(contentBounds!!)
+                    jumpTo(x, y)
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val id = pointer ?: return false
+                    val i = ev.findPointerIndex(id)
+                    if (i >= 0) jumpTo(ev.getX(i), ev.getY(i))
+                    return true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (pointer == null) return false
+                    pointer = null
+                    frozen = null
+                    invalidate()
+                    return true
+                }
+                else -> return pointer != null
+            }
+        }
+
+        /** Перенести центр вида в мировую точку под точкой карты. */
+        private fun jumpTo(x: Float, y: Float) {
+            val l = frozen ?: return
+            val r = rect()
+            val wx = l[0] + (x - r.left - l[3]) / l[2]
+            val wy = l[1] + (y - r.top - l[4]) / l[2]
+            val vp = vm.viewport
+            val cx = vp.screenToWorldX(width / 2f)
+            val cy = vp.screenToWorldY(height / 2f)
+            vp.panBy((cx - wx) * vp.scale, (cy - wy) * vp.scale)
+            vm.viewportChanged()
+            invalidateLayers()
         }
     }
 
@@ -507,6 +725,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         const val MIN_SELECTION_SCALE = 0.1f
         const val MAX_SELECTION_SCALE = 10f
         val SELECTION_COLOR = Color.rgb(0x1F, 0x4E, 0xC9)
+        // Доска: шаг сетки 5 мм, минимальный шаг на экране, размеры мини-карты
+        const val GRID_STEP_WORLD = 5 * PageSpec.UNITS_PER_MM
+        const val GRID_MIN_STEP_DP = 12f
+        const val MINIMAP_W_DP = 180f
+        const val MINIMAP_H_DP = 120f
+        const val MINIMAP_MARGIN_DP = 8f
+        const val MINIMAP_DETAIL_LIMIT = 300
         val BACKGROUND = Color.rgb(0xFB, 0xFA, 0xF7)
         val DESK = Color.rgb(0xE4, 0xE1, 0xDA)
     }

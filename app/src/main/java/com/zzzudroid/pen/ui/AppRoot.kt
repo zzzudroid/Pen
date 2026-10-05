@@ -7,7 +7,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import androidx.navigation.navArgument
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.zzzudroid.pen.diag.DiagnosticsViewModel
@@ -16,10 +18,11 @@ import com.zzzudroid.pen.diag.DiagnosticsViewModel
 object Routes {
     const val HOME = "home"
     const val NOTES = "notes"
-    const val NOTE = "note/{id}"
+    const val NOTE = "note/{id}?page={page}"
     const val SEARCH = "search"
 
-    fun note(id: String) = "note/" + Uri.encode(id)
+    /** Редактор тетради; [page] — индекс страницы с нуля, на которой открыть. */
+    fun note(id: String, page: Int = 0) = "note/" + Uri.encode(id) + "?page=" + page
     const val CANVAS = "canvas"
     const val DIAGNOSTICS = "diagnostics"
     const val ABOUT = "about"
@@ -40,14 +43,16 @@ fun AppRoot(diagnostics: DiagnosticsViewModel) {
             composable(Routes.NOTES) {
                 NotesListScreen(onBack = { nav.popBackStack() }, onOpen = { id -> nav.navigate(Routes.note(id)) })
             }
-            composable(Routes.NOTE) {
+            composable(
+                Routes.NOTE,
+                arguments = listOf(navArgument("page") { type = NavType.IntType; defaultValue = 0 }),
+            ) {
                 NoteEditorScreen(onBack = { nav.popBackStack() })
             }
             composable(Routes.SEARCH) {
                 SearchScreen(
                     onBack = { nav.popBackStack() },
-                    // TODO: открыть сразу нужную страницу (pageIndex) — нужна поддержка в редакторе
-                    onOpen = { id, _ -> nav.navigate(Routes.note(id)) },
+                    onOpen = { id, page -> nav.navigate(Routes.note(id, page)) },
                 )
             }
             composable(Routes.CANVAS) {

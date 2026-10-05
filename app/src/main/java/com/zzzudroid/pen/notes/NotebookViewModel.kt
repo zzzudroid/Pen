@@ -22,6 +22,9 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
 
     val id: String = checkNotNull(handle["id"]) { "Не передан id тетради" }
 
+    /** Страница, на которой открыть тетрадь (из поиска). */
+    private val startPage: Int = handle["page"] ?: 0
+
     var meta by mutableStateOf<NotebookMeta?>(null); private set
     var loadError by mutableStateOf<String?>(null); private set
     var saveError by mutableStateOf<String?>(null); private set
@@ -63,6 +66,8 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
                     })
                 }
                 meta = m
+                // Открыть на странице из поиска (индекс с нуля), если она есть
+                startPage.takeIf { it in this@NotebookViewModel.pages.indices }?.let { goToPage(it) }
                 loaded = true
             } catch (e: Exception) {
                 Log.e(TAG, "Не удалось открыть $id", e)

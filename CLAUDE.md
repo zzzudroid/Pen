@@ -43,6 +43,9 @@ adb logcat -s PenDiag
 - Лассо: `canvas/Lasso.kt` (чистая геометрия, тесты), `canvas/StrokeOps.kt` (новые штрихи Ink из преобразованных
   точек — штрихи неизменяемы), режим лассо и превью в `DrawingSurface`, `ui/SelectionBar.kt`. История: `Replace`,
   `AddMany`; выделение — ссылки на объекты штрихов, снимается при любой смене истории/страницы.
+- Доска — тот же `.pen` с `kind=board` и одной страницей без границ (`pageSpec == null`): `notes/BoardLayout.kt`
+  (чистый расчёт экспорта/миниатюры, тесты), `NotebookViewModel.isBoard` + `boardView`; сетка и мини-карта —
+  флаги `DrawingSurface.showGrid` / `showMinimap` (в «Холсте» выключены).
 - `recognition/` — поиск по рукописи: `LineSegmenter` и `TextSearch` (чистый Kotlin, тесты), `HandwritingRecognizer`
   (ML Kit Digital Ink, модель `ru`, пакет `com.google.mlkit.vision.digitalink.recognition`), `SearchIndex`
   (`filesDir/recognition/index.json`, инкрементально по `meta.modified`). Формат `.pen` не затрагивает.

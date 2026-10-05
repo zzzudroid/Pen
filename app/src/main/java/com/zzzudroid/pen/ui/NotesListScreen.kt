@@ -1,5 +1,9 @@
 package com.zzzudroid.pen.ui
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.Dashboard
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -107,6 +111,7 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     }
 
     var creating by remember { mutableStateOf(false) }
+    var creatingBoard by remember { mutableStateOf(false) }
 
     // Импорт PDF: системный выбор файла → копия в тетрадь (на IO) → редактор
     var importing by remember { mutableStateOf(false) }
@@ -163,6 +168,12 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     )
                     ExtendedFloatingActionButton(
+                        onClick = { creatingBoard = true },
+                        icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) },
+                        text = { Text("Новая доска") },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    )
+                    ExtendedFloatingActionButton(
                         onClick = { creating = true },
                         icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                         text = { Text("Новая тетрадь") },
@@ -216,6 +227,26 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 scope.launch {
                     try {
                         val id = withContext(Dispatchers.IO) { NotebookStore.create(title, template) }
+                        onOpen(id)
+                    } catch (e: Exception) {
+                        snackbar.showSnackbar("Не удалось создать: ${e.message}")
+                    }
+                }
+            },
+        )
+    }
+
+    if (creatingBoard) {
+        TitleDialog(
+            title = "Новая доска",
+            initial = "Доска " + SimpleDateFormat("dd.MM.yyyy", Locale("ru")).format(Date()),
+            confirm = "Создать",
+            onDismiss = { creatingBoard = false },
+            onConfirm = { title ->
+                creatingBoard = false
+                scope.launch {
+                    try {
+                        val id = withContext(Dispatchers.IO) { NotebookStore.createBoard(title) }
                         onOpen(id)
                     } catch (e: Exception) {
                         snackbar.showSnackbar("Не удалось создать: ${e.message}")
@@ -307,9 +338,24 @@ private fun NotebookCard(
         }
         Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(entry.meta?.title ?: entry.id, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Значок доски — чтобы отличать её от тетрадей
+                    if (entry.meta?.isBoard == true) {
+                        Icon(
+                            Icons.Outlined.Dashboard,
+                            contentDescription = "Доска",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(entry.meta?.title ?: entry.id, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                }
                 Text(
-                    entry.meta?.let { "${it.pageIds.size} стр. · ${formatDate(it.modified)}" } ?: (entry.error ?: ""),
+                    entry.meta?.let {
+                        val what = if (it.isBoard) "Доска" else "${it.pageIds.size} стр."
+                        "$what · ${formatDate(it.modified)}"
+                    } ?: (entry.error ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
