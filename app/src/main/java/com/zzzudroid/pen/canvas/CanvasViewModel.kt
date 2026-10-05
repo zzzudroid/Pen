@@ -104,10 +104,10 @@ open class CanvasViewModel : ViewModel() {
     var version by mutableIntStateOf(0); private set
 
     var tool by mutableStateOf(CanvasTool.PEN)
-    var colorIndex by mutableIntStateOf(0)
-    var sizeIndex by mutableIntStateOf(1)
+    var colorIndex by mutableIntStateOf(com.zzzudroid.pen.settings.AppSettings.defaultColor.coerceIn(0, PALETTE.size - 1))
+    var sizeIndex by mutableIntStateOf(com.zzzudroid.pen.settings.AppSettings.defaultSize)
     /** Стирать пальцем: палец работает как штриховой ластик (перо при этом рисует по-прежнему). */
-    var eraseWithFinger by mutableStateOf(false)
+    var eraseWithFinger by mutableStateOf(com.zzzudroid.pen.settings.AppSettings.eraseWithFinger)
     /** Вид заблокирован: пальцы не двигают и не масштабируют поле — только пишем пером. */
     var viewLocked by mutableStateOf(false)
 

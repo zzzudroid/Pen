@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Папка для извлечённых PDF-подложок тетрадей
         PdfSources.init(this)
+        com.zzzudroid.pen.settings.AppSettings.init(this)
         // Нагрузочный тест (только отладочная сборка): --ei stress N
         if (BuildConfig.DEBUG) com.zzzudroid.pen.canvas.DebugStress.apply {
             pending = intent.getIntExtra("stress", 0)

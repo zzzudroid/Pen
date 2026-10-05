@@ -62,6 +62,8 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
             try {
                 val (m, pages, source) = readFromDisk()
                 applyLoaded(m, pages, source)
+                // Только что созданный пустой документ открывается с включённой блокировкой перемещения поля — сразу писать
+                if (pages.values.all { it.isEmpty() } && System.currentTimeMillis() - m.created < NEW_DOC_WINDOW_MS && com.zzzudroid.pen.settings.AppSettings.lockNewDocs) viewLocked = true
                 // Открыть на странице из поиска (индекс с нуля), если она есть
                 startPage.takeIf { it in this@NotebookViewModel.pages.indices }?.let { goToPage(it) }
                 loaded = true
@@ -297,6 +299,9 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     }
 
     companion object {
+        /** Документ моложе этого считается «только что созданным», мс. */
+        private const val NEW_DOC_WINDOW_MS = 60_000L
+
         private const val TAG = "PenNotes"
         const val AUTOSAVE_DELAY_MS = 1500L
     }

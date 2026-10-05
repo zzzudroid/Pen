@@ -85,7 +85,7 @@ class DocumentsState(
             try {
                 val title = HomeLogic.todayTitle()
                 val id = withContext(Dispatchers.IO) {
-                    if (board) NotebookStore.createBoard(title) else NotebookStore.create(title, PageTemplate.LINED)
+                    if (board) NotebookStore.createBoard(title) else NotebookStore.create(title, com.zzzudroid.pen.settings.AppSettings.newNoteTemplate)
                 }
                 onOpen(id)
             } catch (e: Exception) {

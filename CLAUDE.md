@@ -79,5 +79,6 @@ adb logcat -s PenDiag
   `ui/LinkTargetDialog.kt`, `BookmarksSheet`, `BacklinksSheet`. Маршрут `note/{id}?page&bm&view&focus`. `NotebookViewModel.reloadIfChangedOnDisk()`
   на ON_RESUME — чтобы цепочка A→B→A не затёрла чужие правки.
 - `InProgressStrokesView`: после `finishStroke` вызывать `requestHandoff()`, иначе изредка штрих не завершается до внешнего события.
+- Настройки: `settings/AppSettings.kt` (SharedPreferences + состояние Compose, `init` в `MainActivity`, до него — значения по умолчанию), экран `ui/SettingsScreen.kt`.
 - `BuildConfig.BUILD_TIME / GIT_HASH / GIT_DIRTY` — для экрана «О программе»; генерация BuildConfig
   никогда не считается up-to-date.

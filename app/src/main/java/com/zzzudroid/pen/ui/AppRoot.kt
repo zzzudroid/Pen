@@ -42,6 +42,7 @@ object Routes {
     const val CANVAS = "canvas"
     const val DIAGNOSTICS = "diagnostics"
     const val ABOUT = "about"
+    const val SETTINGS = "settings"
 }
 
 @Composable
@@ -86,6 +87,9 @@ fun AppRoot(diagnostics: DiagnosticsViewModel) {
             }
             composable(Routes.DIAGNOSTICS) {
                 DiagnosticsScreen(diagnostics, onBack = { nav.popBackStack() })
+            }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(onBack = { nav.popBackStack() })
             }
             composable(Routes.ABOUT) {
                 AboutScreen(onBack = { nav.popBackStack() })

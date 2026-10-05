@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,7 +42,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -95,6 +95,7 @@ fun HomeScreen(
                     "Холст" to Routes.CANVAS,
                     "Поиск по рукописи" to Routes.SEARCH,
                     "Диагностика пера" to Routes.DIAGNOSTICS,
+                    "Настройки" to Routes.SETTINGS,
                     "О программе" to Routes.ABOUT,
                 ).forEach { (title, route) ->
                     NavigationDrawerItem(
@@ -109,16 +110,6 @@ fun HomeScreen(
     ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Pen") },
-                navigationIcon = {
-                    IconButton(onClick = { scope.launch { drawer.open() } }) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Меню")
-                    }
-                },
-            )
-        },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             val entries = docs.entries
@@ -129,6 +120,11 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Half(
+                        leading = {
+                            IconButton(onClick = { scope.launch { drawer.open() } }) {
+                                Icon(Icons.Filled.Menu, contentDescription = "Меню")
+                            }
+                        },
                         title = "Заметки",
                         kind = DocKind.NOTEBOOK,
                         entries = entries,
@@ -177,6 +173,7 @@ private fun Half(
     onShare: (NotebookEntry) -> Unit,
     onRename: (NotebookEntry) -> Unit,
     onDelete: (NotebookEntry) -> Unit,
+    leading: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     // Заметки и холсты — разные оттенки фона, чтобы половины отличались с первого взгляда
     val tint = if (kind == DocKind.BOARD) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.28f)
@@ -185,11 +182,14 @@ private fun Half(
         modifier.clip(RoundedCornerShape(20.dp)).background(tint).padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.clickable { onOpenList(kind) }.padding(vertical = 12.dp, horizontal = 16.dp),
-        )
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            if (leading != null) Box(Modifier.align(Alignment.CenterStart)) { leading() }
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.clickable { onOpenList(kind) }.padding(vertical = 12.dp, horizontal = 16.dp),
+            )
+        }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
             val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
             val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE

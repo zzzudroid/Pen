@@ -101,6 +101,14 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
         }
     }
 
+    // Не гасить экран, пока открыт редактор (настройка)
+    val hostView = androidx.compose.ui.platform.LocalView.current
+    val keepOn = com.zzzudroid.pen.settings.AppSettings.keepScreenOn
+    DisposableEffect(keepOn) {
+        hostView.keepScreenOn = keepOn
+        onDispose { hostView.keepScreenOn = false }
+    }
+
     var confirmDeletePage by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
     var showBacklinks by remember { mutableStateOf(false) }
@@ -241,8 +249,8 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                         factory = { ctx ->
                             DrawingSurface(ctx, vm).also { surface ->
                                 // Доске — точечная сетка и мини-карта для навигации
-                                surface.showGrid = vm.isBoard
-                                surface.showMinimap = vm.isBoard && !(com.zzzudroid.pen.BuildConfig.DEBUG && com.zzzudroid.pen.canvas.DebugStress.noMinimap)
+                                surface.showGrid = vm.isBoard && com.zzzudroid.pen.settings.AppSettings.boardGrid
+                                surface.showMinimap = vm.isBoard && com.zzzudroid.pen.settings.AppSettings.boardMinimap && !(com.zzzudroid.pen.BuildConfig.DEBUG && com.zzzudroid.pen.canvas.DebugStress.noMinimap)
                                 // Подложка страницы из исходного PDF; актуальные страница и источник читаются при каждой отрисовке
                                 surface.pageBackground = { canvas, spec, scale, invalidate ->
                                     drawPdfBackground(canvas, spec, scale, vm.pdfSource, vm.page.pdfPage, invalidate)
@@ -254,7 +262,9 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                             vm.version
                             // Плавающая панель слева в полноэкранном режиме — мини-карта сдвигается правее неё
                             surface.minimapInsetStartDp = if (fullscreen) 68f else 0f
-                            surface.onLinkClick = ::openLink
+                            surface.onLinkClick = if (com.zzzudroid.pen.settings.AppSettings.linksByTap) ::openLink else null
+                            surface.showGrid = vm.isBoard && com.zzzudroid.pen.settings.AppSettings.boardGrid
+                            surface.showMinimap = vm.isBoard && com.zzzudroid.pen.settings.AppSettings.boardMinimap && !(com.zzzudroid.pen.BuildConfig.DEBUG && com.zzzudroid.pen.canvas.DebugStress.noMinimap)
                             surface.dimmedLinks = dimmed
                             surface.refresh()
                         },
