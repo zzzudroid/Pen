@@ -88,6 +88,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         addView(inProgress, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(overlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(minimap, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        inProgress.eagerInit()
         inProgress.addFinishedStrokesListener(object : InProgressStrokesFinishedListener {
             override fun onStrokesFinished(strokes: Map<InProgressStrokeId, Stroke>) {
                 // Сначала штрих попадает в нижний слой, и только потом убирается из верхнего — без мигания
@@ -276,7 +277,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         drawing.remove(id)?.let { strokeId ->
             // Отпускание с FLAG_CANCELED — система решила, что касание случайное
             if (ev.flags and MotionEvent.FLAG_CANCELED != 0) inProgress.cancelStroke(strokeId, ev)
-            else inProgress.finishStroke(ev, id, strokeId)
+            else {
+                inProgress.finishStroke(ev, id, strokeId)
+                // Не ждать паузы-«отстоя»: сразу передать готовый штрих в слой штрихов
+                inProgress.requestHandoff()
+            }
         }
 
         if (erasing.remove(id) != null && erasing.isEmpty()) finishErasing()
