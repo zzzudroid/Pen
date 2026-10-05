@@ -109,7 +109,14 @@ fun NotebookCard(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        Row(Modifier.padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Миниатюра отделена от блока подписи: линия и слегка затемнённая подложка подписи
+        if (ink != null) androidx.compose.material3.HorizontalDivider(color = ink.copy(alpha = 0.50f), thickness = 2.dp)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .then(if (ink != null) Modifier.background(ink.copy(alpha = 0.17f)) else Modifier)
+                .padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Значок типа одного размера и на одном месте у тетради и у доски; тип словами не пишем
