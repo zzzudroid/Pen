@@ -184,12 +184,14 @@ blockquote p{margin:0}
 <li>Каждое изменение — команда (<code>AddStroke</code>, <code>Erase</code>, <code>Transform</code>…) → бесконечный undo/redo и в будущем синхронизация через журнал операций.</li>
 <li>Файл документа: <code>document.pen</code> = zip { <code>meta.json</code>, <code>pages/*.pb</code>, <code>assets/*</code>, <code>thumb.png</code> } — легко бэкапить и переносить.</li>
 </ul>
-<h3>Формат <code>.pen</code> v1 (реализовано)</h3>
+<h3>Формат <code>.pen</code> v2 (реализовано; v1 читается)</h3>
 <p>Единицы мира — 5 ед./мм; страница A4 (книжная) = 1050 × 1485.</p>
 <pre><code>&lt;название&gt;.pen  (zip, Documents/Pen/)
  ├─ meta.json            — formatVersion, title, template (blank|lined|grid|dots),
- │                         pageWidth, pageHeight, unitsPerMm, created, modified, pages: [id…]
+ │                         pageWidth, pageHeight, unitsPerMm, created, modified, pages: [id…],
+ │                         pageInfo: [{id, width, height, template, pdfPage?}], hasPdfSource   (v2)
  ├─ pages/&lt;id&gt;.strokes   — штрихи страницы (бинарный, DataOutputStream)
+ ├─ source.pdf           — исходный PDF для тетрадей-разметок (v2, необязателен)
  └─ thumb.png            — миниатюра первой страницы, 300 px по ширине
 </code></pre>
 <p>Файл <code>.strokes</code>: <code>int</code> число штрихов; на каждый штрих — <code>UTF</code> id инструмента (<code>pen</code> / <code>marker</code> / <code>highlighter</code>),
@@ -276,7 +278,7 @@ blockquote p{margin:0}
 <tr>
 <td><strong>4. PDF</strong></td>
 <td>Открытие, разметка, экспорт</td>
-<td>Второй режим</td>
+<td>Второй режим. <em>Код готов (change <code>pdf-annotate</code>), ждёт проверки на устройстве</em></td>
 </tr>
 <tr>
 <td><strong>5. Доска</strong></td>

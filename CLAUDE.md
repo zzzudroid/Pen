@@ -43,6 +43,10 @@ adb logcat -s PenDiag
 - Лассо: `canvas/Lasso.kt` (чистая геометрия, тесты), `canvas/StrokeOps.kt` (новые штрихи Ink из преобразованных
   точек — штрихи неизменяемы), режим лассо и превью в `DrawingSurface`, `ui/SelectionBar.kt`. История: `Replace`,
   `AddMany`; выделение — ссылки на объекты штрихов, снимается при любой смене истории/страницы.
+- Разметка PDF: у страницы свой `PageState.spec` и `pdfPage`; `CanvasViewModel.pageSpec` = spec текущей страницы.
+  `notes/PdfSource.kt` (импорт, извлечение `source.pdf` в cacheDir, `PdfSources.init` в MainActivity),
+  `notes/PdfPageCache.kt` (фоновый рендер `PdfRenderer` под Mutex, ступени 512–4096, LRU). Формат `.pen` v2.
+  Подложка рисуется через `DrawingSurface.pageBackground` — canvas не зависит от notes.
 - `notes/PdfExporter` — векторный PDF рядом с `.pen` (контуры `outlinesToPath`, не `CanvasStrokeRenderer`),
   пишется под тем же `writeLock` сразу после `.pen`; ошибка PDF не откатывает `.pen` (`pdfError`).
   «Поделиться» — `FileProvider` (`${applicationId}.files`), перед отправкой `saveAndAwait()`.

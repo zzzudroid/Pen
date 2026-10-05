@@ -94,6 +94,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     /** Модель изменилась извне (отмена, повтор, сброс вида, выделение). */
     fun refresh() = invalidateLayers()
 
+    /**
+     * Подложка листа вместо шаблона: рисует в мировых координатах (canvas уже умножен на матрицу вида).
+     * Возвращает true, если нарисовала; invalidate — перерисовать слой, когда подложка дорендерится.
+     * Не задана — рисуется обычный шаблон страницы.
+     */
+    var pageBackground: ((canvas: Canvas, spec: PageSpec, scale: Float, invalidate: () -> Unit) -> Boolean)? = null
+
     private fun invalidateLayers() {
         strokesLayer.invalidate()
         overlay.invalidate()
@@ -425,7 +432,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                 canvas.drawColor(DESK)
                 canvas.save()
                 canvas.concat(matrix)
-                drawPage(canvas, spec, vm.viewport.scale)
+                // Своя подложка (например, страница PDF); если её нет — шаблон листа
+                val custom = pageBackground?.invoke(canvas, spec, vm.viewport.scale) { invalidate() } ?: false
+                if (!custom) drawPage(canvas, spec, vm.viewport.scale)
                 canvas.restore()
             }
             // Во время перетаскивания выделенные штрихи рисует оверлей

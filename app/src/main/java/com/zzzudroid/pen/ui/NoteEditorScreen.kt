@@ -1,5 +1,8 @@
 package com.zzzudroid.pen.ui
 
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +53,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zzzudroid.pen.canvas.DrawingSurface
+import com.zzzudroid.pen.canvas.PageSpec
+import com.zzzudroid.pen.notes.PdfPageCache
+import java.io.File
 import com.zzzudroid.pen.notes.NotebookStore
 import com.zzzudroid.pen.notes.NotebookViewModel
 import kotlinx.coroutines.launch
@@ -133,7 +139,14 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                     CanvasToolbar(vm)
                     SelectionBar(vm)
                     AndroidView(
-                        factory = { ctx -> DrawingSurface(ctx, vm) },
+                        factory = { ctx ->
+                            DrawingSurface(ctx, vm).also { surface ->
+                                // Подложка страницы из исходного PDF; актуальные страница и источник читаются при каждой отрисовке
+                                surface.pageBackground = { canvas, spec, scale, invalidate ->
+                                    drawPdfBackground(canvas, spec, scale, vm.pdfSource, vm.page.pdfPage, invalidate)
+                                }
+                            }
+                        },
                         // Чтение version подписывает перерисовку холста на изменения модели
                         update = { surface -> vm.version; surface.refresh() },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -190,4 +203,30 @@ private fun PageBar(index: Int, count: Int, onPrev: () -> Unit, onNext: () -> Un
             Text("Страница")
         }
     }
+}
+
+private val pdfSheetPaint = Paint().apply { color = android.graphics.Color.WHITE }
+private val pdfBitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+private val pdfBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    color = android.graphics.Color.rgb(0xC8, 0xC4, 0xBC)
+    style = Paint.Style.STROKE
+}
+
+/** Нарисовать страницу PDF подложкой листа; false — у страницы нет PDF (рисуется шаблон). */
+private fun drawPdfBackground(
+    canvas: Canvas,
+    spec: PageSpec,
+    scale: Float,
+    source: File?,
+    pdfPage: Int?,
+    invalidate: () -> Unit,
+): Boolean {
+    if (source == null || pdfPage == null) return false
+    val rect = RectF(0f, 0f, spec.width, spec.height)
+    canvas.drawRect(rect, pdfSheetPaint)
+    val widthPx = (spec.width * scale).toInt().coerceAtLeast(1)
+    PdfPageCache.get(source, pdfPage, widthPx, invalidate)?.let { canvas.drawBitmap(it, null, rect, pdfBitmapPaint) }
+    pdfBorderPaint.strokeWidth = 1f / scale
+    canvas.drawRect(rect, pdfBorderPaint)
+    return true
 }

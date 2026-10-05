@@ -1,9 +1,13 @@
 package com.zzzudroid.pen.ui
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -33,6 +38,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -65,6 +71,7 @@ import com.zzzudroid.pen.canvas.PageTemplate
 import com.zzzudroid.pen.notes.NotebookEntry
 import com.zzzudroid.pen.notes.NotebookFormat
 import com.zzzudroid.pen.notes.NotebookStore
+import com.zzzudroid.pen.notes.importPdf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,6 +107,25 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     }
 
     var creating by remember { mutableStateOf(false) }
+
+    // Импорт PDF: системный выбор файла → копия в тетрадь (на IO) → редактор
+    var importing by remember { mutableStateOf(false) }
+    val pickPdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        importing = true
+        scope.launch {
+            try {
+                val id = withContext(Dispatchers.IO) {
+                    NotebookStore.importPdf(context, uri, pdfTitle(context, uri))
+                }
+                onOpen(id)
+            } catch (e: Exception) {
+                snackbar.showSnackbar("Не удалось открыть PDF: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                importing = false
+            }
+        }
+    }
     var renaming by remember { mutableStateOf<NotebookEntry?>(null) }
     var deleting by remember { mutableStateOf<NotebookEntry?>(null) }
 
@@ -129,11 +155,19 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
         },
         floatingActionButton = {
             if (hasAccess) {
-                ExtendedFloatingActionButton(
-                    onClick = { creating = true },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text("Новая тетрадь") },
-                )
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ExtendedFloatingActionButton(
+                        onClick = { if (!importing) pickPdf.launch(arrayOf("application/pdf")) },
+                        icon = { Icon(Icons.Outlined.PictureAsPdf, contentDescription = null) },
+                        text = { Text("Открыть PDF") },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    )
+                    ExtendedFloatingActionButton(
+                        onClick = { creating = true },
+                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        text = { Text("Новая тетрадь") },
+                    )
+                }
             }
         },
     ) { padding ->
@@ -188,6 +222,15 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     }
                 }
             },
+        )
+    }
+
+    if (importing) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Импорт PDF…") },
+            text = { LinearProgressIndicator(Modifier.fillMaxWidth()) },
+            confirmButton = {},
         )
     }
 
@@ -325,3 +368,15 @@ private fun TitleDialog(title: String, initial: String, confirm: String, onDismi
 
 private fun formatDate(millis: Long): String =
     SimpleDateFormat("d MMM yyyy, HH:mm", Locale("ru")).format(Date(millis))
+
+/** Название тетради из имени выбранного PDF без расширения; запасной вариант — «PDF». */
+private fun pdfTitle(context: Context, uri: Uri): String {
+    val name = try {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (e: Exception) {
+        null
+    }
+    return name?.removeSuffix(".pdf")?.removeSuffix(".PDF")?.trim()?.ifEmpty { null } ?: "PDF"
+}
