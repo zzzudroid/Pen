@@ -176,7 +176,12 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                             }
                         },
                         // Чтение version подписывает перерисовку холста на изменения модели
-                        update = { surface -> vm.version; surface.refresh() },
+                        update = { surface ->
+                            vm.version
+                            // Плавающая панель слева в полноэкранном режиме — мини-карта сдвигается правее неё
+                            surface.minimapInsetStartDp = if (fullscreen) 68f else 0f
+                            surface.refresh()
+                        },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
                     // У доски нет страниц — панель страниц не нужна

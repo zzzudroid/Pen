@@ -114,6 +114,10 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     var showMinimap = false
         set(value) { field = value; minimap.invalidate() }
 
+    /** Отступ мини-карты от левого края, dp: в полноэкранном режиме — ширина плавающей панели инструментов слева. */
+    var minimapInsetStartDp = 0f
+        set(value) { if (field != value) { field = value; minimap.invalidate() } }
+
     private fun invalidateLayers() {
         strokesLayer.invalidate()
         overlay.invalidate()
@@ -633,7 +637,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             val w = MINIMAP_W_DP * density
             val h = MINIMAP_H_DP * density
             val margin = MINIMAP_MARGIN_DP * density
-            return Bounds(width - margin - w, height - margin - h, width - margin, height - margin)
+            // Левый верхний угол; в полноэкранном режиме сдвинута вправо от плавающей панели инструментов
+            val left = margin + minimapInsetStartDp * density
+            return Bounds(left, margin, left + w, margin + h)
         }
 
         private fun refreshContent() {
