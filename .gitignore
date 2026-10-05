@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+*.keystore
+!debug.keystore
+keystore.properties
+
+# Локальные бэкапы APK (резерв перед заливкой на планшет) — не в репозиторий
+/dist/

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Иконка: наклонное перо с росчерком -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- корпус пера -->
+    <path
+        android:fillColor="#F2EDE4"
+        android:pathData="M68,30 L78,40 L48,70 L38,60 Z" />
+    <!-- наконечник -->
+    <path
+        android:fillColor="#E8875A"
+        android:pathData="M38,60 L48,70 L34,74 Z" />
+    <!-- росчерк -->
+    <path
+        android:strokeColor="#E8875A"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M30,80 C40,76 46,84 56,80 S70,76 78,80" />
+</vector>
