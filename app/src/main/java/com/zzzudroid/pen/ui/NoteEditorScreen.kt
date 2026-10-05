@@ -168,7 +168,7 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                             DrawingSurface(ctx, vm).also { surface ->
                                 // Доске — точечная сетка и мини-карта для навигации
                                 surface.showGrid = vm.isBoard
-                                surface.showMinimap = vm.isBoard
+                                surface.showMinimap = vm.isBoard && !(com.zzzudroid.pen.BuildConfig.DEBUG && com.zzzudroid.pen.canvas.DebugStress.noMinimap)
                                 // Подложка страницы из исходного PDF; актуальные страница и источник читаются при каждой отрисовке
                                 surface.pageBackground = { canvas, spec, scale, invalidate ->
                                     drawPdfBackground(canvas, spec, scale, vm.pdfSource, vm.page.pdfPage, invalidate)

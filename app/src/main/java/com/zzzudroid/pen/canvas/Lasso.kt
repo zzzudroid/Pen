@@ -12,6 +12,8 @@ data class Bounds(val left: Float, val top: Float, val right: Float, val bottom:
     /** Расширить во все стороны на [d]. */
     fun inflate(d: Float) = Bounds(left - d, top - d, right + d, bottom + d)
 
+    fun intersects(o: Bounds) = right >= o.left && left <= o.right && bottom >= o.top && top <= o.bottom
+
     fun union(o: Bounds) = Bounds(
         minOf(left, o.left), minOf(top, o.top), maxOf(right, o.right), maxOf(bottom, o.bottom),
     )

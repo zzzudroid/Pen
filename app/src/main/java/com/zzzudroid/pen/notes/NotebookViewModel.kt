@@ -6,7 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.zzzudroid.pen.BuildConfig
 import com.zzzudroid.pen.canvas.CanvasViewModel
+import com.zzzudroid.pen.canvas.DebugStress
 import com.zzzudroid.pen.canvas.PageState
 import com.zzzudroid.pen.canvas.PageTemplate
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +71,15 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
                 // Открыть на странице из поиска (индекс с нуля), если она есть
                 startPage.takeIf { it in this@NotebookViewModel.pages.indices }?.let { goToPage(it) }
                 loaded = true
+                // Нагрузочный тест (только отладочная сборка)
+                if (BuildConfig.DEBUG) {
+                    val n = DebugStress.take()
+                    if (n > 0) {
+                        val span = DebugStress.span.takeIf { it > 0f } ?: if (m.isBoard) 20000f else 1000f
+                        debugAddStrokes(DebugStress.strokes(n, span))
+                        if (DebugStress.viewScale > 0f) restoreView(DebugStress.viewScale, 0f, 0f)
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Не удалось открыть $id", e)
                 loadError = e.message ?: e.javaClass.simpleName
@@ -81,17 +92,27 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
         dirty = true
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
-            delay(AUTOSAVE_DELAY_MS)
-            saveNow()
+            // На больших документах сохранение дорогое: пауза растёт вместе с временем прошлой записи,
+            // чтобы запись не шла почти непрерывно, пока человек рисует
+            delay(maxOf(AUTOSAVE_DELAY_MS, lastPenSaveMs * 3))
+            startSave(force = false)
         }
     }
+
+    // Адаптивное автосохранение: время прошлых записей и момент последнего PDF
+    @Volatile private var lastPenSaveMs = 0L
+    @Volatile private var lastPdfAt = 0L
+    @Volatile private var lastPdfMs = 0L
+
+    // Автосохранение пропустило PDF — при ближайшем принудительном сохранении его нужно обновить
+    @Volatile private var pdfStale = false
 
     /**
      * Сохранить сразу, если есть изменения. Снимок берётся на главном потоке,
      * запись идёт в области процесса — она доживёт до конца даже после закрытия экрана.
      */
     fun saveNow() {
-        startSave()
+        startSave(force = true)
     }
 
     /**
@@ -99,17 +120,18 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
      * Если изменений нет, всё равно ждём текущую запись, чтобы не отдать полузаписанный файл.
      */
     suspend fun saveAndAwait() {
-        val job = startSave()
+        val job = startSave(force = true)
         if (job != null) job.join() else NotebookStore.writeLock.withLock { }
     }
 
     /** Запустить сохранение, если есть изменения; возвращает задачу записи или null. */
-    private fun startSave(): Job? {
+    private fun startSave(force: Boolean): Job? {
         saveJob?.cancel()
         val m = meta ?: return null
         // У доски сохраняем и вид: сдвиг/масштаб без правок тоже стоит записать
         val view = if (m.isBoard) BoardView(viewport.scale, viewport.tx, viewport.ty) else null
-        if (!dirty && view == m.boardView) return null
+        // Принудительное сохранение (выход, сворачивание, «поделиться») обновляет и пропущенный ранее PDF
+        if (!dirty && view == m.boardView && !(force && pdfStale)) return null
         dirty = false
         val snapshot = pages.associate { it.id to it.strokes.toList() }
         val fallback = m.pageSpec
@@ -129,13 +151,28 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
             try {
                 var pdfFailure: String? = null
                 NotebookStore.writeLock.withLock {
+                    val t0 = System.nanoTime()
                     NotebookFormat.write(file, newMeta, snapshot, source)
-                    // PDF-копия для ПК; её сбой не делает .pen несохранённым
-                    try {
-                        PdfExporter.write(pdf, newMeta, snapshot, source)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Не удалось экспортировать PDF $id", e)
-                        pdfFailure = e.message ?: e.javaClass.simpleName
+                    val t1 = System.nanoTime()
+                    lastPenSaveMs = (t1 - t0) / 1_000_000
+                    // PDF-копия для ПК; её сбой не делает .pen несохранённым. Автосохранение на больших документах
+                    // обновляет PDF не чаще, чем раз в десять его собственных длительностей; принудительное — всегда
+                    val pdfDue = force || System.currentTimeMillis() - lastPdfAt >= lastPdfMs * 10
+                    if (pdfDue) {
+                        try {
+                            val p0 = System.nanoTime()
+                            PdfExporter.write(pdf, newMeta, snapshot, source)
+                            lastPdfMs = (System.nanoTime() - p0) / 1_000_000
+                            lastPdfAt = System.currentTimeMillis()
+                            pdfStale = false
+                            Log.i("PenPerf", "сохранение: .pen $lastPenSaveMs мс, pdf $lastPdfMs мс, штрихов ${snapshot.values.sumOf { it.size }}")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Не удалось экспортировать PDF $id", e)
+                            pdfFailure = e.message ?: e.javaClass.simpleName
+                        }
+                    } else {
+                        pdfStale = true
+                        Log.i("PenPerf", "сохранение: .pen $lastPenSaveMs мс, pdf отложен, штрихов ${snapshot.values.sumOf { it.size }}")
                     }
                 }
                 withContext(Dispatchers.Main) {

@@ -22,6 +22,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Папка для извлечённых PDF-подложок тетрадей
         PdfSources.init(this)
+        // Нагрузочный тест (только отладочная сборка): --ei stress N
+        if (BuildConfig.DEBUG) com.zzzudroid.pen.canvas.DebugStress.apply {
+            pending = intent.getIntExtra("stress", 0)
+            span = intent.getIntExtra("span", 0).toFloat()
+            viewScale = intent.getFloatExtra("scale", 0f)
+            noMinimap = intent.getBooleanExtra("nomap", false)
+        }
         enableEdgeToEdge()
         setContent { AppRoot(diagnostics) }
     }

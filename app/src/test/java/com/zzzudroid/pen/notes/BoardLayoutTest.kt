@@ -18,6 +18,19 @@ class BoardLayoutTest {
     }
 
     @Test
+    fun `огромная доска уменьшается до предела страницы PDF`() {
+        // 100 000 ед. ≈ 20 м ≈ 56 700 пт — вдвое-вчетверо больше предела
+        val p = BoardLayout.exportPage(Bounds(0f, 0f, 100_000f, 1_000f), marginMm = 0f, maxPagePt = 14_000f)
+        assertEquals(14_000f, 100_000f * BoardLayout.POINTS_PER_UNIT * p.scale, 1f)
+    }
+
+    @Test
+    fun `обычная доска не уменьшается`() {
+        val p = BoardLayout.exportPage(Bounds(0f, 0f, 2_000f, 1_000f))
+        assertEquals(1f, p.scale, 0f)
+    }
+
+    @Test
     fun `пустая доска — лист A4`() {
         val p = BoardLayout.exportPage(null)
         assertEquals(1050f, p.width, 1e-4f)

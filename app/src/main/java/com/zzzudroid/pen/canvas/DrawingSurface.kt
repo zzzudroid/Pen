@@ -2,12 +2,14 @@ package com.zzzudroid.pen.canvas
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RenderNode
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
@@ -207,11 +209,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             if (lassoPointer == null) startLasso(ev.getX(i), ev.getY(i), id)
             return
         }
-        // На странице с границами штрих начинается только на листе
+        // На странице с границами штрих начинается только на листе, на безграничном холсте — внутри его предела
         val spec = vm.pageSpec
+        val w = worldPoint(ev.getX(i), ev.getY(i))
         if (spec != null) {
-            val w = worldPoint(ev.getX(i), ev.getY(i))
             if (!spec.contains(w[0], w[1])) return
+        } else if (kotlin.math.abs(w[0]) > CanvasViewModel.WORLD_LIMIT || kotlin.math.abs(w[1]) > CanvasViewModel.WORLD_LIMIT) {
+            return
         }
         val brush = vm.brush(density, eraserOverride = eraser)
         if (brush == null) {
@@ -389,7 +393,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                 val polygon = LassoPolygon(loopXs.toFloatArray(), loopYs.toFloatArray())
                 val pb = polygon.bounds
                 val picked = vm.strokes.filter { s ->
-                    val sb = StrokeOps.bounds(listOf(s)) ?: return@filter false
+                    val sb = vm.strokeBounds(s)
                     // Быстрый отсев по рамкам, затем точная проверка точек штриха
                     val overlap = sb.right >= pb.left && sb.left <= pb.right && sb.bottom >= pb.top && sb.top <= pb.bottom
                     overlap && StrokeOps.points(s).let { (xs, ys) -> polygon.selects(xs, ys) }
@@ -428,7 +432,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             ImmutableSegment(ImmutableVec(from[0], from[1]), ImmutableVec(to[0], to[1])),
             radius,
         )
-        val hit = vm.strokes.filter { it.shape.intersects(area, AffineTransform.IDENTITY) }
+        // Сначала дешёвый отсев по границам, и только потом точная проверка пересечения
+        val box = Bounds(minOf(from[0], to[0]) - radius, minOf(from[1], to[1]) - radius, maxOf(from[0], to[0]) + radius, maxOf(from[1], to[1]) + radius)
+        val hit = vm.strokesIn(box).filter { it.shape.intersects(area, AffineTransform.IDENTITY) }
         if (hit.isEmpty()) return
         hit.forEach { vm.removeLive(it) }
         erasedNow += hit
@@ -444,7 +450,25 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     private inner class StrokesLayer(context: Context) : View(context) {
         private val matrix = Matrix()
 
+        // Отладка: среднее время onDraw слоя штрихов, раз в 2 с в лог PenPerf
+        private var perfNanos = 0L
+        private var perfFrames = 0
+        private var perfSince = 0L
+
         override fun onDraw(canvas: Canvas) {
+            val t0 = System.nanoTime()
+            drawLayer(canvas)
+            if (com.zzzudroid.pen.BuildConfig.DEBUG) {
+                perfNanos += System.nanoTime() - t0
+                perfFrames++
+                if (t0 - perfSince > 2_000_000_000L) {
+                    if (perfSince != 0L) android.util.Log.i("PenPerf", "onDraw слоя штрихов: ${perfNanos / perfFrames / 1000} мкс/кадр, кадров $perfFrames, штрихов ${vm.strokes.size}")
+                    perfSince = t0; perfNanos = 0; perfFrames = 0
+                }
+            }
+        }
+
+        private fun drawLayer(canvas: Canvas) {
             vm.viewMatrix(matrix)
             val spec = vm.pageSpec
             if (spec == null) {
@@ -465,8 +489,61 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             val hidden = if (preview != null) previewSet else null
             canvas.save()
             canvas.concat(matrix)
-            for (s in vm.strokes) if (hidden == null || s !in hidden) renderer.draw(canvas, s, matrix)
+            val vp = vm.viewport
+            val view = Bounds(vp.screenToWorldX(0f), vp.screenToWorldY(0f), vp.screenToWorldX(width.toFloat()), vp.screenToWorldY(height.toFloat()))
+            if (hidden == null && vm.strokes.size >= CHUNK_MODE_MIN_STROKES) {
+                // Много штрихов: пачки записаны в графические списки один раз и только воспроизводятся с текущим
+                // преобразованием — запись тысяч штрихов каждый кадр загружает процессор и роняет плавность
+                syncChunks(vm.strokes)
+                for (c in chunks) if (c.bounds.intersects(view)) canvas.drawRenderNode(c.node)
+            } else {
+                // Мало штрихов (или идёт перетаскивание выделения): рисуем только видимые напрямую
+                for (s in vm.strokesIn(view)) if (hidden == null || s !in hidden) renderer.draw(canvas, s, matrix)
+            }
             canvas.restore()
+        }
+
+        // --- Пачки штрихов в графических списках ---
+
+        private inner class Chunk(val strokes: List<Stroke>) {
+            val node = RenderNode("strokes")
+            val bounds: Bounds
+
+            init {
+                // Запись ведётся со сдвигом OFFSET: координаты холста бывают отрицательными, а размер записи неотрицателен;
+                // узел ставится в (-OFFSET, -OFFSET), поэтому на экране штрихи оказываются на своих местах
+                node.setPosition(-OFFSET, -OFFSET, OFFSET, OFFSET)
+                node.setClipToBounds(false)
+                val rc = node.beginRecording(2 * OFFSET, 2 * OFFSET)
+                try {
+                    rc.translate(OFFSET.toFloat(), OFFSET.toFloat())
+                    for (s in strokes) renderer.draw(rc, s, IDENTITY)
+                } finally {
+                    node.endRecording()
+                }
+                bounds = strokes.map { vm.strokeBounds(it) }.reduce { a, b -> a.union(b) }
+            }
+        }
+
+        private val chunks = ArrayList<Chunk>()
+
+        /** Привести пачки в соответствие со штрихами: перезаписываются только изменившиеся (по ссылкам). */
+        private fun syncChunks(all: List<Stroke>) {
+            val count = (all.size + CHUNK_SIZE - 1) / CHUNK_SIZE
+            while (chunks.size > count) chunks.removeAt(chunks.lastIndex)
+            for (i in 0 until count) {
+                val slice = all.subList(i * CHUNK_SIZE, minOf(all.size, (i + 1) * CHUNK_SIZE))
+                val old = chunks.getOrNull(i)
+                if (old != null && sameStrokes(old.strokes, slice)) continue
+                val fresh = Chunk(slice.toList())
+                if (i < chunks.size) chunks[i] = fresh else chunks.add(fresh)
+            }
+        }
+
+        private fun sameStrokes(a: List<Stroke>, b: List<Stroke>): Boolean {
+            if (a.size != b.size) return false
+            for (k in a.indices) if (a[k] !== b[k]) return false
+            return true
         }
     }
 
@@ -532,6 +609,22 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         private var contentBounds: Bounds? = null
         private val contentPath = Path()
 
+        // Много штрихов: вместо контура из тысяч прямоугольников — по точке в центре каждого (один вызов drawPoints)
+        private var contentPoints = FloatArray(0)
+        private var contentPointCount = 0
+        private val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(0x44, 0x44, 0x44)
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        // Картинка содержимого: рисуется один раз при изменении штрихов, на кадр остаётся лишь нарисовать её
+        private var contentBitmap: Bitmap? = null
+        private var bitmapVersion = -1
+        private var bitmapStrokes: List<Stroke>? = null
+        private var bitmapW = 0
+        private var bitmapH = 0
+        private var bitmapLayout: FloatArray? = null
+
         // Замороженная раскладка на время жеста: [wl, wt, k, ox, oy]
         private var pointer: Int? = null
         private var frozen: FloatArray? = null
@@ -544,16 +637,19 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         }
 
         private fun refreshContent() {
-            if (cachedVersion == vm.version && cachedStrokes === vm.strokes) return
-            cachedVersion = vm.version
+            if (cachedVersion == vm.contentVersion && cachedStrokes === vm.strokes) return
+            cachedVersion = vm.contentVersion
             cachedStrokes = vm.strokes
             val strokes = vm.strokes
-            contentBounds = StrokeOps.bounds(strokes)
+            contentBounds = strokes.map { vm.strokeBounds(it) }.reduceOrNull { a, b -> a.union(b) }
             contentPath.reset()
+            contentPointCount = 0
             if (strokes.size > MINIMAP_DETAIL_LIMIT) {
-                // Много штрихов — только их рамки
-                for (s in strokes) StrokeOps.bounds(listOf(s))?.let {
-                    contentPath.addRect(it.left, it.top, it.right, it.bottom, Path.Direction.CW)
+                // Много штрихов — точка в центре каждого
+                if (contentPoints.size < strokes.size * 2) contentPoints = FloatArray(strokes.size * 2)
+                for (s in strokes) vm.strokeBounds(s).let {
+                    contentPoints[contentPointCount++] = (it.left + it.right) / 2
+                    contentPoints[contentPointCount++] = (it.top + it.bottom) / 2
                 }
             } else {
                 // Штрихи ломаными по каждой 4-й точке
@@ -580,11 +676,14 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             )
         }
 
-        /** Раскладка [wl, wt, k, ox, oy]: экран карты = rect.left + ox + (x - wl) * k. */
+        /**
+         * Раскладка [wl, wt, k, ox, oy]: экран карты = rect.left + ox + (x - wl) * k.
+         * Зависит только от содержимого (с запасом 25% по краям), а не от вида, поэтому нарисованная
+         * картинка содержимого не пересчитывается при сдвиге и масштабе.
+         */
         private fun layout(content: Bounds): FloatArray {
             val r = rect()
-            var world = content.union(viewWorld())
-            world = world.inflate(maxOf(world.width, world.height) * 0.05f)
+            val world = content.inflate(maxOf(content.width, content.height, 1f) * 0.25f)
             val k = minOf(r.width / world.width, r.height / world.height)
             val ox = (r.width - world.width * k) / 2
             val oy = (r.height - world.height * k) / 2
@@ -597,25 +696,64 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             return contentBounds != null
         }
 
+        // Отладка: среднее время onDraw мини-карты
+        private var perfNanos = 0L
+        private var perfFrames = 0
+        private var perfSince = 0L
+
+        /** Перерисовать картинку содержимого, если изменились штрихи, страница или размер карты. */
+        private fun refreshBitmap(content: Bounds) {
+            val r = rect()
+            val w = r.width.toInt().coerceAtLeast(1)
+            val h = r.height.toInt().coerceAtLeast(1)
+            if (contentBitmap != null && bitmapVersion == vm.contentVersion && bitmapStrokes === vm.strokes && bitmapW == w && bitmapH == h) return
+            val bmp = contentBitmap?.takeIf { it.width == w && it.height == h } ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            bmp.eraseColor(Color.TRANSPARENT)
+            val l = layout(content)
+            val c = Canvas(bmp)
+            c.translate(l[3], l[4])
+            c.scale(l[2], l[2])
+            c.translate(-l[0], -l[1])
+            ink.strokeWidth = 1.2f * density / l[2]
+            c.drawPath(contentPath, ink)
+            if (contentPointCount > 0) {
+                pointPaint.strokeWidth = 2.4f * density / l[2]
+                c.drawPoints(contentPoints, 0, contentPointCount, pointPaint)
+            }
+            contentBitmap = bmp
+            bitmapVersion = vm.contentVersion
+            bitmapStrokes = vm.strokes
+            bitmapW = w
+            bitmapH = h
+            bitmapLayout = l
+        }
+
         override fun onDraw(canvas: Canvas) {
+            val t0 = System.nanoTime()
+            drawMinimap(canvas)
+            if (com.zzzudroid.pen.BuildConfig.DEBUG) {
+                perfNanos += System.nanoTime() - t0
+                perfFrames++
+                if (t0 - perfSince > 2_000_000_000L) {
+                    if (perfSince != 0L) android.util.Log.i("PenPerf", "onDraw мини-карты: ${perfNanos / perfFrames / 1000} мкс/кадр, кадров $perfFrames")
+                    perfSince = t0; perfNanos = 0; perfFrames = 0
+                }
+            }
+        }
+
+        private fun drawMinimap(canvas: Canvas) {
             if (!visible()) return
             val content = contentBounds ?: return
+            refreshBitmap(content)
             val r = rect()
-            val l = frozen ?: layout(content)
+            val l = frozen ?: bitmapLayout ?: layout(content)
             val radius = 8f * density
             canvas.drawRoundRect(r.left, r.top, r.right, r.bottom, radius, radius, bg)
             canvas.save()
             clip.reset()
             clip.addRoundRect(r.left, r.top, r.right, r.bottom, radius, radius, Path.Direction.CW)
             canvas.clipPath(clip)
-            m.setTranslate(-l[0], -l[1])
-            m.postScale(l[2], l[2])
-            m.postTranslate(r.left + l[3], r.top + l[4])
-            canvas.save()
-            canvas.concat(m)
-            ink.strokeWidth = 1.2f * density / l[2]
-            canvas.drawPath(contentPath, ink)
-            canvas.restore()
+            contentBitmap?.let { canvas.drawBitmap(it, r.left, r.top, null) }
             val v = viewWorld()
             val x0 = r.left + l[3]
             val y0 = r.top + l[4]
@@ -726,6 +864,19 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
     companion object {
         const val ERASER_RADIUS_DP = 10f
+
+        /** С этого числа штрихов на странице включается запись в графические списки. */
+        const val CHUNK_MODE_MIN_STROKES = 400
+
+        /** Штрихов в одной пачке: изменение перезаписывает только свою пачку. */
+        const val CHUNK_SIZE = 256
+
+        /**
+         * Сдвиг записи, ед. холста (±100 000 ≈ ±20 м). Не больше, чтобы дробная часть координат (float) не терялась
+         * при сдвиге: на 100 000 точность ≈ 0,008 ед., при увеличении ×32 это четверть пикселя.
+         */
+        const val OFFSET = 100_000 // = CanvasViewModel.WORLD_LIMIT
+        private val IDENTITY = Matrix()
         const val TAP_MAX_MS = 250L
         const val TAP_MAX_TRAVEL_DP = 24f
         const val MIN_PINCH_PX = 10f

@@ -86,12 +86,13 @@ object PdfExporter {
     /** Доска — одна страница по границам содержимого с полями 10 мм, белый фон. */
     private fun writeBoardPage(doc: PdfDocument, strokes: List<Stroke>, paint: Paint) {
         val layout = BoardLayout.exportPage(StrokeOps.bounds(strokes))
-        val widthPt = (layout.width * POINTS_PER_UNIT).roundToInt().coerceAtLeast(1)
-        val heightPt = (layout.height * POINTS_PER_UNIT).roundToInt().coerceAtLeast(1)
+        val k = POINTS_PER_UNIT * layout.scale
+        val widthPt = (layout.width * k).roundToInt().coerceAtLeast(1)
+        val heightPt = (layout.height * k).roundToInt().coerceAtLeast(1)
         val page = doc.startPage(PdfDocument.PageInfo.Builder(widthPt, heightPt, 1).create())
         val c = page.canvas
         c.drawColor(Color.WHITE)
-        c.scale(POINTS_PER_UNIT, POINTS_PER_UNIT)
+        c.scale(k, k)
         c.translate(layout.offsetX, layout.offsetY)
         drawStrokes(c, strokes, paint)
         doc.finishPage(page)

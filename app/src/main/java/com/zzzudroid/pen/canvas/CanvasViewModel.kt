@@ -199,6 +199,26 @@ open class CanvasViewModel : ViewModel() {
         changed(content = true)
     }
 
+    // Границы штрихов по геометрии: считаются один раз (штрихи неизменяемы), чтобы отсекать невидимые без вызовов в нативный код
+    private val boundsCache = java.util.WeakHashMap<Stroke, Bounds>()
+
+    /** Границы штриха в мировых координатах (с кэшем). */
+    fun strokeBounds(s: Stroke): Bounds = boundsCache.getOrPut(s) {
+        s.shape.computeBoundingBox()?.let { Bounds(it.xMin, it.yMin, it.xMax, it.yMax) } ?: Bounds(0f, 0f, 0f, 0f)
+    }
+
+    /** Штрихи текущей страницы, чьи границы пересекают [area] (мировые координаты). */
+    fun strokesIn(area: Bounds): List<Stroke> = strokes.filter { s ->
+        val b = strokeBounds(s)
+        b.right >= area.left && b.left <= area.right && b.bottom >= area.top && b.top <= area.bottom
+    }
+
+    /** Только отладка: добавить штрихи без истории и выделения (нагрузочный тест). */
+    fun debugAddStrokes(list: List<Stroke>) {
+        strokes += list
+        changed(content = true)
+    }
+
     // --- Страницы ---
 
     fun goToPage(index: Int) {
@@ -233,6 +253,8 @@ open class CanvasViewModel : ViewModel() {
     /** Заменить содержимое (загрузка тетради). */
     protected fun replacePages(spec: PageSpec?, newPages: List<PageState>) {
         defaultPageSpec = spec
+        // Безграничному холсту (доске) можно отдаляться сильнее, чем странице
+        viewport.minScale = if (spec == null) BOARD_MIN_SCALE else Viewport.MIN_SCALE
         pages.clear()
         pages += newPages.ifEmpty { listOf(PageState(newPageId())) }
         pageIndex = 0
@@ -282,7 +304,10 @@ open class CanvasViewModel : ViewModel() {
         changed(content = false)
     }
 
-    fun viewportChanged() = changed(content = false)
+    fun viewportChanged() {
+        if (pageSpec == null && viewWidth > 0) viewport.clampCenter(WORLD_LIMIT, viewWidth.toFloat(), viewHeight.toFloat())
+        changed(content = false)
+    }
 
     /** Восстановить сохранённый вид (доска открывается там, где её закрыли). */
     protected fun restoreView(scale: Float, tx: Float, ty: Float) {
@@ -315,8 +340,12 @@ open class CanvasViewModel : ViewModel() {
     /** Содержимое (штрихи, страницы) изменилось — наследники сохраняют. */
     protected open fun onContentChanged() {}
 
+    /** Растёт только при изменении содержимого (штрихи, страницы) — не при сдвиге и масштабе; по нему кэшируются тяжёлые данные. */
+    var contentVersion = 0; private set
+
     private fun changed(content: Boolean) {
         version++
+        if (content) contentVersion++
         if (content) onContentChanged()
     }
 
@@ -326,6 +355,12 @@ open class CanvasViewModel : ViewModel() {
         val HIGHLIGHTER_SIZES = listOf(10f, 18f, 28f)
         const val BRUSH_EPSILON = 0.1f
         const val PAGE_MARGIN_DP = 16f
+
+        /** Границы безграничного холста: ±100 000 ед. ≈ ±20 м. Дальше штрихи не рисуются и вид не уходит. */
+        const val WORLD_LIMIT = 100_000f
+
+        /** Минимальный масштаб безграничного холста: экран шириной 3200 пикселей охватывает 160 000 ед. ≈ 32 м. */
+        const val BOARD_MIN_SCALE = 0.02f
 
         fun newPageId(): String = UUID.randomUUID().toString().substring(0, 8)
 
