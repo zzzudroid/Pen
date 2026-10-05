@@ -3,6 +3,7 @@ package com.zzzudroid.pen.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,9 +52,10 @@ import com.zzzudroid.pen.canvas.ColorMath
 import com.zzzudroid.pen.settings.AppSettings
 
 /**
- * Один из трёх кружков-пресетов цвета. Нажатие выбирает пресет и выдвигает панель настройки цвета
+ * Один из трёх кружков-пресетов цвета. Короткое нажатие выбирает пресет, долгое — выдвигает панель настройки цвета
  * (сетка тонов или полосы, прозрачность, пипетка, образец).
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ColorPresetButton(vm: CanvasViewModel, index: Int, buttonSize: Dp, circle: Dp = 28.dp) {
     var open by rememberSaveable { mutableStateOf(false) }
@@ -72,12 +74,19 @@ fun ColorPresetButton(vm: CanvasViewModel, index: Int, buttonSize: Dp, circle: D
                     color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     shape = CircleShape,
                 )
-                .clickable {
-                    AppSettings.putActivePreset(index)
-                    // Выбрать цвет — значит рисовать им: из ластика переходим на ручку
-                    if (vm.tool == CanvasTool.ERASER) vm.tool = CanvasTool.PEN
-                    open = true
-                },
+                .combinedClickable(
+                    // Короткое нажатие — просто выбрать пресет; долгое — выдвинуть панель настройки цвета
+                    onClick = {
+                        AppSettings.putActivePreset(index)
+                        // Выбрать цвет — значит рисовать им: из ластика переходим на ручку
+                        if (vm.tool == CanvasTool.ERASER) vm.tool = CanvasTool.PEN
+                    },
+                    onLongClick = {
+                        AppSettings.putActivePreset(index)
+                        if (vm.tool == CanvasTool.ERASER) vm.tool = CanvasTool.PEN
+                        open = true
+                    },
+                ),
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             ColorPanel(vm, index, onEyedropper = { open = false })
