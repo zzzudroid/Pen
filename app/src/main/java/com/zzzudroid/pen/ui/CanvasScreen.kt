@@ -124,21 +124,8 @@ fun CanvasToolbar(vm: CanvasViewModel) {
 
         ToolbarDivider()
 
-        PALETTE.forEachIndexed { i, argb ->
-            val selected = vm.colorIndex == i
-            Box(
-                Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(Color(argb))
-                    .border(
-                        width = if (selected) 3.dp else 1.dp,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        shape = CircleShape,
-                    )
-                    .clickable { vm.colorIndex = i; if (vm.tool == CanvasTool.ERASER) vm.tool = CanvasTool.PEN },
-            )
-        }
+        // Три пресета цвета: нажатие выдвигает панель настройки
+        for (i in 0 until 3) ColorPresetButton(vm, i, ToolButtonSize)
 
         ToolbarDivider()
 

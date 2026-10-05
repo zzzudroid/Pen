@@ -73,26 +73,6 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Section("Перо")
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text("Цвет по умолчанию", style = MaterialTheme.typography.bodyLarge)
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PALETTE.forEachIndexed { i, argb ->
-                        val selected = AppSettings.defaultColor == i
-                        Box(
-                            Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(argb))
-                                .border(
-                                    if (selected) 3.dp else 1.dp,
-                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                    CircleShape,
-                                )
-                                .clickable { AppSettings.putDefaultColor(i) },
-                        )
-                    }
-                }
-            }
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text("Красивое перо: сила сглаживания", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     "Кнопка «красивое перо» на панели: сглаживание, плоское каллиграфическое перо и толщина по скорости. Чем сильнее сглаживание, тем заметнее отставание линии от кончика",

@@ -107,8 +107,8 @@ private fun BrushPanel(vm: CanvasViewModel, tool: CanvasTool, size: Float, range
 /** Образец: волнистая линия с заострёнными концами на «шахматном» фоне, цвет и толщина — как у пера. */
 @Composable
 private fun StrokePreview(vm: CanvasViewModel, tool: CanvasTool, sizeMm: Float) {
-    val base = Color(PALETTE[vm.colorIndex])
-    val color = if (tool == CanvasTool.HIGHLIGHTER) base.copy(alpha = 0.4f) else base
+    val base = Color(vm.colorArgb)
+    val color = if (tool == CanvasTool.HIGHLIGHTER && base.alpha == 1f) base.copy(alpha = 0.4f) else base
     Canvas(
         Modifier
             .fillMaxWidth()

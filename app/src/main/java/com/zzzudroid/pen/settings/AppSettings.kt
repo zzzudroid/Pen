@@ -44,8 +44,9 @@ object AppSettings {
     /** Действующий уровень сглаживания для пера: 0, если выключено. */
     val smoothing: Int get() = if (smoothingOn) smoothingStrength else 0
 
-    /** Цвет пера по умолчанию — номер в палитре. */
-    var defaultColor by mutableStateOf(0); private set
+    /** Три пресета цвета пера (ARGB; прозрачность — в старшем байте) и номер выбранного. */
+    val presets = androidx.compose.runtime.mutableStateListOf(0xFF1A1A1A.toInt(), 0xFF1F4EC9.toInt(), 0xFFD32F2F.toInt())
+    var activePreset by mutableStateOf(0); private set
 
     /** Давление: влияет ли нажим и скорость письма на толщину линии. */
     var pressureOn by mutableStateOf(true); private set
@@ -62,7 +63,8 @@ object AppSettings {
         keepScreenOn = p.getBoolean("keepScreenOn", false)
         smoothingOn = p.getBoolean("smoothingOn", false)
         smoothingStrength = p.getInt("smoothingStrength", 2).coerceIn(1, 3)
-        defaultColor = p.getInt("defaultColor", 0)
+        for (i in presets.indices) presets[i] = p.getInt("preset$i", presets[i])
+        activePreset = p.getInt("activePreset", 0).coerceIn(0, presets.size - 1)
         pressureOn = p.getBoolean("pressureOn", true)
     }
 
@@ -79,7 +81,8 @@ object AppSettings {
     fun putKeepScreenOn(v: Boolean) { keepScreenOn = v; save { putBoolean("keepScreenOn", v) } }
     fun putSmoothingOn(v: Boolean) { smoothingOn = v; save { putBoolean("smoothingOn", v) } }
     fun putSmoothingStrength(v: Int) { smoothingStrength = v; save { putInt("smoothingStrength", v) } }
-    fun putDefaultColor(v: Int) { defaultColor = v; save { putInt("defaultColor", v) } }
+    fun putPreset(i: Int, argb: Int) { presets[i] = argb; save { putInt("preset$i", argb) } }
+    fun putActivePreset(i: Int) { activePreset = i; save { putInt("activePreset", i) } }
     fun putPressureOn(v: Boolean) { pressureOn = v; save { putBoolean("pressureOn", v) } }
 
     /** Запомненная толщина инструмента [id], мм; [def], если ещё не задавали. */

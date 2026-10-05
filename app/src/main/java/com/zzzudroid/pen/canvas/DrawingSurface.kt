@@ -511,6 +511,12 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         if (tap && gestureMaxFingers >= 2) strokesLayer.invalidate()
         // Тап одним пальцем по области ссылки открывает цель; перо поверх ссылки по-прежнему пишет
         if (tap && gestureMaxFingers == 1) {
+            // Пипетка: тап пальцем берёт цвет ближайшего штриха в выбранный пресет
+            vm.eyedropper?.let { idx ->
+                vm.pickColorAt(gestureStartWorld[0], gestureStartWorld[1])?.let { com.zzzudroid.pen.settings.AppSettings.putPreset(idx, it) }
+                vm.eyedropper = null
+                return
+            }
             vm.linkAt(gestureStartWorld[0], gestureStartWorld[1])?.let { onLinkClick?.invoke(it) }
         }
     }

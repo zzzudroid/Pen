@@ -135,7 +135,27 @@ open class CanvasViewModel : ViewModel() {
     var version by mutableIntStateOf(0); private set
 
     var tool by mutableStateOf(CanvasTool.PEN)
-    var colorIndex by mutableIntStateOf(com.zzzudroid.pen.settings.AppSettings.defaultColor.coerceIn(0, PALETTE.size - 1))
+    /** Цвет пера — выбранный пресет (ARGB, с прозрачностью). */
+    val colorArgb: Int get() = com.zzzudroid.pen.settings.AppSettings.presets[com.zzzudroid.pen.settings.AppSettings.activePreset]
+
+    /** Пипетка: номер пресета, в который возьмём цвет штриха под пальцем; null — выключена. */
+    var eyedropper by mutableStateOf<Int?>(null)
+
+    /** Цвет ближайшего к точке (x, y) штриха (в пределах [radius] ед. мира) или null. */
+    fun pickColorAt(x: Float, y: Float, radius: Float = 24f): Int? {
+        var best: Stroke? = null
+        var bestD = radius * radius
+        for (s in strokes) {
+            val box = s.shape.computeBoundingBox() ?: continue
+            if (x < box.xMin - radius || x > box.xMax + radius || y < box.yMin - radius || y > box.yMax + radius) continue
+            val (xs, ys) = StrokeOps.points(s)
+            for (i in xs.indices) {
+                val d = (xs[i] - x) * (xs[i] - x) + (ys[i] - y) * (ys[i] - y)
+                if (d < bestD) { bestD = d; best = s }
+            }
+        }
+        return best?.brush?.colorIntArgb
+    }
     // Толщина каждого инструмента, мм: тянется ползунком (BrushSizeButton), запоминается между запусками
     private val brushSizesMm = androidx.compose.runtime.mutableStateMapOf<CanvasTool, Float>().apply {
         for (t in CanvasTool.entries) put(t, com.zzzudroid.pen.settings.AppSettings.toolSizeMm(t.id, DEFAULT_SIZE_MM[t] ?: 0.4f))
@@ -464,7 +484,7 @@ open class CanvasViewModel : ViewModel() {
         // Кнопка «красивое перо» превращает ручку в каллиграфическое перо (штрихи сохраняются как «calligraphy»)
         val effective = brushTool
         val family = Brushes.family(effective) ?: return null
-        val base = PALETTE[colorIndex]
+        val base = colorArgb
         val color = if (effective == CanvasTool.HIGHLIGHTER) highlighterColor(base) else base
         // Размер хранится в единицах холста: делим на масштаб вида, чтобы на экране линия была заданной толщины
         // при любом увеличении (лист вписан по ширине — масштаб около 3)
@@ -520,6 +540,7 @@ open class CanvasViewModel : ViewModel() {
 
         fun newPageId(): String = UUID.randomUUID().toString().substring(0, 8)
 
-        private fun highlighterColor(c: Int) = Color.argb(0x66, Color.red(c), Color.green(c), Color.blue(c))
+        // Выделитель полупрозрачный; если пользователь задал свою прозрачность — берём её
+        private fun highlighterColor(c: Int) = if (Color.alpha(c) < 255) c else Color.argb(0x66, Color.red(c), Color.green(c), Color.blue(c))
     }
 }

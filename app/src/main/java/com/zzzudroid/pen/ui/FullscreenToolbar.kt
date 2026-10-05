@@ -146,39 +146,8 @@ private fun BarDivider() {
 /** Кнопка текущего цвета; по нажатию выпадает ряд из шести цветов. */
 @Composable
 private fun ColorMenuButton(vm: CanvasViewModel) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(ButtonSize)) {
-        Box(
-            Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(Color(PALETTE[vm.colorIndex]))
-                .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                .clickable { open = true },
-        )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PALETTE.forEachIndexed { i, argb ->
-                    val selected = vm.colorIndex == i
-                    Box(
-                        Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(argb))
-                            .border(
-                                width = if (selected) 3.dp else 1.dp,
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                shape = CircleShape,
-                            )
-                            .clickable {
-                                vm.colorIndex = i
-                                if (vm.tool == CanvasTool.ERASER) vm.tool = CanvasTool.PEN
-                                open = false
-                            },
-                    )
-                }
-            }
-        }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        for (i in 0 until 3) ColorPresetButton(vm, i, ButtonSize)
     }
 }
 
