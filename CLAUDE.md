@@ -15,6 +15,13 @@ Pen — личное Android-приложение для рукописного 
 - Разработка идёт на Windows и Linux: машинно-зависимое — только в `local.properties` / `keystore.properties` (оба не в git).
 - Каждое изменение отражать в `CHANGELOG.md`.
 
+## Устройство (измерено)
+
+Xiaomi Pad 7 (2410CRP4CG), HyperOS 3.0, Android 16 (SDK 36), 3200×2136 @ 440 dpi, адаптивный 120 Гц.
+Focus Pen: давление ≈ 8192 уровня, наклон, азимут, hover, опрос ≈ 330 Гц; **кнопка перехвачена системой** и приложению
+не приходит. Подробно — `docs/design.md`, раздел 2. В Git Bash пути `/sdcard/...` подменяются — для `adb pull/push/shell ls`
+ставить `MSYS_NO_PATHCONV=1`. Файлы заметок — `/sdcard/Documents/Pen/` (рядом лежит и чужое содержимое: не трогать).
+
 ## Команды
 
 ```bash

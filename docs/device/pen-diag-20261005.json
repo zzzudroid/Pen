@@ -1,0 +1,483 @@
+{
+  "createdAt": "2026-10-05T18:12:24+03:00",
+  "build": {
+    "versionName": "0.1",
+    "versionCode": 1,
+    "buildTime": "2026-10-05 18:02",
+    "gitHash": "dd511c2",
+    "gitDirty": false
+  },
+  "device": {
+    "manufacturer": "Xiaomi",
+    "model": "2410CRP4CG",
+    "device": "uke",
+    "sdk": 36,
+    "release": "16",
+    "incremental": "OS3.0.303.0.WOZRUXM",
+    "refreshRate": 120.00000762939453,
+    "supportedRefreshRates": [
+      120.00000762939453,
+      144.00001525878906,
+      90,
+      60.000003814697266,
+      50,
+      48.000003814697266,
+      30.000001907348633
+    ],
+    "screenPx": "3200x2136",
+    "densityDpi": 440
+  },
+  "session": {
+    "totalEvents": 360,
+    "hoverSeen": true,
+    "unbufferedDispatch": false,
+    "buttonStates": [],
+    "keyCodes": []
+  },
+  "tools": [
+    {
+      "tool": "STYLUS",
+      "contactSamples": 605,
+      "hoverSamples": 400,
+      "pressure": {
+        "min": 1.2208521366119385E-4,
+        "max": 0.8266389966011047
+      },
+      "pressureLevels": 220,
+      "tiltDeg": {
+        "min": 15.129715919494629,
+        "max": 45.217613220214844
+      },
+      "orientationDeg": {
+        "min": -103.41096496582031,
+        "max": -21.485549926757812
+      },
+      "contactRateHz": 327.7,
+      "hoverRateHz": 204.2,
+      "avgHistoricalPerEvent": 2.3
+    },
+    {
+      "tool": "FINGER",
+      "contactSamples": 2,
+      "hoverSamples": 0,
+      "pressure": {
+        "min": 0,
+        "max": 1
+      },
+      "pressureLevels": 2,
+      "tiltDeg": {
+        "min": 0,
+        "max": 0
+      },
+      "orientationDeg": {
+        "min": 0,
+        "max": 0
+      },
+      "contactRateHz": 0,
+      "hoverRateHz": 0,
+      "avgHistoricalPerEvent": 0
+    }
+  ],
+  "inputDevices": [
+    {
+      "id": 13,
+      "name": "NVTCapacitiveTouchScreen",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "TOUCHSCREEN",
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": [
+        {
+          "axis": "X",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 2135.900146484375,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "Y",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 3199.900146484375,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "PRESSURE",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "SIZE",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "TOUCH_MAJOR",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 3847.401123046875,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "TOUCH_MINOR",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 3847.401123046875,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "TOOL_MAJOR",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 3847.401123046875,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "TOOL_MINOR",
+          "source": "TOUCHSCREEN",
+          "min": 0,
+          "max": 3847.401123046875,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "NVTCapacitivePenM80p",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "STYLUS",
+        "TOUCHSCREEN",
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": [
+        {
+          "axis": "X",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 2135.900146484375,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "Y",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 3199.900146484375,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "PRESSURE",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "ORIENTATION",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": -3.1415927410125732,
+          "max": 3.1415927410125732,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "DISTANCE",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "TILT",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 1.5707963705062866,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "NVTCapacitivePenP81c",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "STYLUS",
+        "TOUCHSCREEN",
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": [
+        {
+          "axis": "X",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 2135.900146484375,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "Y",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 3199.900146484375,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "PRESSURE",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "ORIENTATION",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": -3.1415927410125732,
+          "max": 3.1415927410125732,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "DISTANCE",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "TILT",
+          "source": "STYLUS|TOUCHSCREEN",
+          "min": 0,
+          "max": 1.5707963705062866,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "LTRIGGER",
+          "source": "JOYSTICK",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "BRAKE",
+          "source": "JOYSTICK",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        }
+      ]
+    },
+    {
+      "id": -1,
+      "name": "Virtual",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "KEYBOARD",
+        "DPAD"
+      ],
+      "external": false,
+      "virtual": true,
+      "axes": []
+    },
+    {
+      "id": 2,
+      "name": "gpio-keys",
+      "vendorId": "0x0001",
+      "productId": "0x0001",
+      "sources": [
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 3,
+      "name": "uinput-xiaomi",
+      "vendorId": "0x0666",
+      "productId": "0x0888",
+      "sources": [
+        "KEYBOARD",
+        "GAMEPAD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 4,
+      "name": "pmic_pwrkey",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 5,
+      "name": "pmic_resin",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 6,
+      "name": "xiaomi-hall",
+      "vendorId": "0x0efa",
+      "productId": "0x0001",
+      "sources": [],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 7,
+      "name": "pmic_pwrkey_resin_bark",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 8,
+      "name": "pmic_pwrkey_bark",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 17,
+      "name": "cliffs-mtp-snd-card Headset Jack",
+      "vendorId": "0x0000",
+      "productId": "0x0000",
+      "sources": [
+        "KEYBOARD"
+      ],
+      "external": false,
+      "virtual": false,
+      "axes": []
+    },
+    {
+      "id": 18,
+      "name": "Xiaomi Focus Pen Mouse",
+      "vendorId": "0x0022",
+      "productId": "0x4d80",
+      "sources": [
+        "MOUSE",
+        "KEYBOARD"
+      ],
+      "external": true,
+      "virtual": false,
+      "axes": [
+        {
+          "axis": "X",
+          "source": "MOUSE",
+          "min": 0,
+          "max": 3199,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "Y",
+          "source": "MOUSE",
+          "min": 0,
+          "max": 2135,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "PRESSURE",
+          "source": "MOUSE",
+          "min": 0,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        },
+        {
+          "axis": "VSCROLL",
+          "source": "MOUSE",
+          "min": -1,
+          "max": 1,
+          "resolution": 0,
+          "fuzz": 0,
+          "flat": 0
+        }
+      ]
+    }
+  ]
+}
