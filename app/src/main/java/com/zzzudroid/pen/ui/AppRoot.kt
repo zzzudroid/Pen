@@ -13,11 +13,15 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.zzzudroid.pen.diag.DiagnosticsViewModel
+import com.zzzudroid.pen.notes.DocKind
 
 // Маршруты навигации
 object Routes {
     const val HOME = "home"
-    const val NOTES = "notes"
+    const val LIST = "list/{kind}"
+
+    /** Полный список документов одного вида: `notes` — тетради, `boards` — доски. */
+    fun list(kind: DocKind) = "list/" + if (kind == DocKind.BOARD) "boards" else "notes"
     const val NOTE = "note/{id}?page={page}"
     const val SEARCH = "search"
 
@@ -38,10 +42,15 @@ fun AppRoot(diagnostics: DiagnosticsViewModel) {
         val nav = rememberNavController()
         NavHost(navController = nav, startDestination = Routes.HOME) {
             composable(Routes.HOME) {
-                HomeScreen(onOpen = { route -> nav.navigate(route) })
+                HomeScreen(
+                    onNavigate = { route -> nav.navigate(route) },
+                    onOpenList = { kind -> nav.navigate(Routes.list(kind)) },
+                    onOpenDocument = { id -> nav.navigate(Routes.note(id)) },
+                )
             }
-            composable(Routes.NOTES) {
-                NotesListScreen(onBack = { nav.popBackStack() }, onOpen = { id -> nav.navigate(Routes.note(id)) })
+            composable(Routes.LIST, arguments = listOf(navArgument("kind") { type = NavType.StringType })) { entry ->
+                val kind = if (entry.arguments?.getString("kind") == "boards") DocKind.BOARD else DocKind.NOTEBOOK
+                NotesListScreen(kind = kind, onBack = { nav.popBackStack() }, onOpen = { id -> nav.navigate(Routes.note(id)) })
             }
             composable(
                 Routes.NOTE,
