@@ -47,8 +47,8 @@ object AppSettings {
     /** Цвет пера по умолчанию — номер в палитре. */
     var defaultColor by mutableStateOf(0); private set
 
-    /** Толщина пера по умолчанию — 0, 1 или 2. */
-    var defaultSize by mutableStateOf(1); private set
+    /** Давление: влияет ли нажим и скорость письма на толщину линии. */
+    var pressureOn by mutableStateOf(true); private set
 
     fun init(context: Context) {
         val p = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -63,7 +63,7 @@ object AppSettings {
         smoothingOn = p.getBoolean("smoothingOn", false)
         smoothingStrength = p.getInt("smoothingStrength", 2).coerceIn(1, 3)
         defaultColor = p.getInt("defaultColor", 0)
-        defaultSize = p.getInt("defaultSize", 1).coerceIn(0, 2)
+        pressureOn = p.getBoolean("pressureOn", true)
     }
 
     private fun save(edit: SharedPreferences.Editor.() -> Unit) {
@@ -80,5 +80,10 @@ object AppSettings {
     fun putSmoothingOn(v: Boolean) { smoothingOn = v; save { putBoolean("smoothingOn", v) } }
     fun putSmoothingStrength(v: Int) { smoothingStrength = v; save { putInt("smoothingStrength", v) } }
     fun putDefaultColor(v: Int) { defaultColor = v; save { putInt("defaultColor", v) } }
-    fun putDefaultSize(v: Int) { defaultSize = v; save { putInt("defaultSize", v) } }
+    fun putPressureOn(v: Boolean) { pressureOn = v; save { putBoolean("pressureOn", v) } }
+
+    /** Запомненная толщина инструмента [id], мм; [def], если ещё не задавали. */
+    fun toolSizeMm(id: String, def: Float): Float = prefs?.getFloat("sizeMm_$id", def) ?: def
+
+    fun putToolSizeMm(id: String, v: Float) { save { putFloat("sizeMm_$id", v) } }
 }

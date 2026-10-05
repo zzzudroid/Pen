@@ -142,24 +142,8 @@ fun CanvasToolbar(vm: CanvasViewModel) {
 
         ToolbarDivider()
 
-        // Три толщины: точки разного размера
-        listOf(7.dp, 12.dp, 18.dp).forEachIndexed { i, dot ->
-            val selected = vm.sizeIndex == i
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = if (selected) 2.dp else 0.dp,
-                        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = CircleShape,
-                    )
-                    .clickable { vm.sizeIndex = i },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(Modifier.size(dot).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface))
-            }
-        }
+        // Толщина: кнопка с выпадающим ползунком
+        BrushSizeButton(vm, ToolButtonSize)
 
         ToolbarDivider()
 

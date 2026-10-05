@@ -114,14 +114,15 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
      * Точки штриха через адаптивный фильтр One Euro: на медленных движениях дрожание гасится сильно,
      * на быстрых линия почти не отстаёт. Координаты — мировые; давление, наклон и азимут берутся из события как есть.
      */
-    private inner class SmoothedStroke(level: Int, private val downTime: Long) {
+    private inner class SmoothedStroke(level: Int, private val downTime: Long, private val pressureOn: Boolean = true) {
         // Чем сильнее сглаживание, тем ниже минимальная частота среза и слабее реакция на скорость
-        private val fx = OneEuro(minCutoff = when (level) { 1 -> 4f; 2 -> 2f; else -> 1f }, beta = when (level) { 1 -> 0.02f; 2 -> 0.01f; else -> 0.006f })
+        private val fx = OneEuro(minCutoff = when (level) { 0 -> 1000f; 1 -> 4f; 2 -> 2f; else -> 1f }, beta = when (level) { 0 -> 0f; 1 -> 0.02f; 2 -> 0.01f; else -> 0.006f })
         private val fy = OneEuro(minCutoff = fx.minCutoff, beta = fx.beta)
 
         private fun input(ev: MotionEvent, i: Int, t: Long, x: Float, y: Float, h: Int, speedWidth: Boolean = false): StrokeInput {
             var pressure = if (h < 0) ev.getPressure(i) else ev.getHistoricalPressure(i, h)
-            if (speedWidth) pressure = live(pressure, x, y, t)
+            // «Давление» выключено — постоянное; включено — реальный нажим со скоростью (при красивом пере)
+            pressure = if (!pressureOn) 0.7f else if (speedWidth) live(pressure, x, y, t) else pressure
             val orientation = if (h < 0) ev.getOrientation(i) else ev.getHistoricalOrientation(i, h)
             val tilt = if (h < 0) ev.getAxisValue(MotionEvent.AXIS_TILT, i) else ev.getHistoricalAxisValue(MotionEvent.AXIS_TILT, i, h)
             // Ink строг к диапазонам: азимут Android −π…π, Ink ждёт 0…2π
@@ -368,14 +369,16 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             eraseAlong(erasing[id]!!, erasing[id]!!)
         } else {
             val level = com.zzzudroid.pen.settings.AppSettings.smoothing
-            if (level > 0) {
+            val pressureOn = com.zzzudroid.pen.settings.AppSettings.pressureOn
+            // Без сглаживания и с давлением — штрих идёт прямо из MotionEvent; иначе через собственный путь точек
+            if (level > 0 || !pressureOn) {
                 // Сглаженный штрих: точки идут через фильтр, а не прямо из MotionEvent
                 vm.viewMatrix(viewMatrix)
-                val sm = SmoothedStroke(level.coerceAtMost(2), ev.eventTime)
+                val sm = SmoothedStroke(level.coerceAtMost(2), ev.eventTime, pressureOn)
                 val first = sm.first(ev, i, worldPoint(ev.getX(i), ev.getY(i)))
                 drawing[id] = inProgress.startStroke(first, brush, Matrix(viewMatrix))
                 smoothers[id] = sm
-                beautifyLevels[drawing.getValue(id)] = level
+                if (level > 0) beautifyLevels[drawing.getValue(id)] = level
             } else {
                 vm.viewMatrix(viewMatrix).invert(worldMatrix)
                 drawing[id] = inProgress.startStroke(ev, id, brush, worldMatrix)

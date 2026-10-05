@@ -91,12 +91,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
                 }
-                Text("Толщина по умолчанию", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 16.dp))
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Тонкое", "Среднее", "Толстое").forEachIndexed { i, name ->
-                        FilterChip(selected = AppSettings.defaultSize == i, onClick = { AppSettings.putDefaultSize(i) }, label = { Text(name) })
-                    }
-                }
             }
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text("Красивое перо: сила сглаживания", style = MaterialTheme.typography.bodyLarge)

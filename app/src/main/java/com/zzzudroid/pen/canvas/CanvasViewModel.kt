@@ -136,7 +136,20 @@ open class CanvasViewModel : ViewModel() {
 
     var tool by mutableStateOf(CanvasTool.PEN)
     var colorIndex by mutableIntStateOf(com.zzzudroid.pen.settings.AppSettings.defaultColor.coerceIn(0, PALETTE.size - 1))
-    var sizeIndex by mutableIntStateOf(com.zzzudroid.pen.settings.AppSettings.defaultSize)
+    // Толщина каждого инструмента, мм: тянется ползунком (BrushSizeButton), запоминается между запусками
+    private val brushSizesMm = androidx.compose.runtime.mutableStateMapOf<CanvasTool, Float>().apply {
+        for (t in CanvasTool.entries) put(t, com.zzzudroid.pen.settings.AppSettings.toolSizeMm(t.id, DEFAULT_SIZE_MM[t] ?: 0.4f))
+    }
+
+    /** Инструмент, которым реально рисуется: при включённом «красивом пере» ручка — каллиграфическое перо. */
+    val brushTool: CanvasTool get() = if (tool == CanvasTool.PEN && com.zzzudroid.pen.settings.AppSettings.smoothingOn) CanvasTool.CALLIGRAPHY else tool
+
+    fun sizeOf(t: CanvasTool): Float = brushSizesMm[t] ?: 0.4f
+
+    fun setSize(t: CanvasTool, mm: Float) {
+        brushSizesMm[t] = mm
+        com.zzzudroid.pen.settings.AppSettings.putToolSizeMm(t.id, mm)
+    }
     /** Стирать пальцем: палец работает как штриховой ластик (перо при этом рисует по-прежнему). */
     var eraseWithFinger by mutableStateOf(com.zzzudroid.pen.settings.AppSettings.eraseWithFinger)
     /** Вид заблокирован: пальцы не двигают и не масштабируют поле — только пишем пером. */
@@ -449,19 +462,13 @@ open class CanvasViewModel : ViewModel() {
     fun brush(density: Float, eraserOverride: Boolean = false): Brush? {
         if (eraserOverride) return null
         // Кнопка «красивое перо» превращает ручку в каллиграфическое перо (штрихи сохраняются как «calligraphy»)
-        val effective = if (tool == CanvasTool.PEN && com.zzzudroid.pen.settings.AppSettings.smoothingOn) CanvasTool.CALLIGRAPHY else tool
+        val effective = brushTool
         val family = Brushes.family(effective) ?: return null
         val base = PALETTE[colorIndex]
-        val sizes = when (effective) {
-            CanvasTool.MARKER -> MARKER_SIZES
-            CanvasTool.HIGHLIGHTER -> HIGHLIGHTER_SIZES
-            CanvasTool.CALLIGRAPHY -> CALLIGRAPHY_SIZES
-            else -> PEN_SIZES
-        }
         val color = if (effective == CanvasTool.HIGHLIGHTER) highlighterColor(base) else base
         // Размер хранится в единицах холста: делим на масштаб вида, чтобы на экране линия была заданной толщины
         // при любом увеличении (лист вписан по ширине — масштаб около 3)
-        return Brush.createWithColorIntArgb(family, color, sizes[sizeIndex] * density / viewport.scale, BRUSH_EPSILON)
+        return Brush.createWithColorIntArgb(family, color, sizeOf(effective) / MM_PER_DP * density / viewport.scale, BRUSH_EPSILON)
     }
 
     /** Матрица мир → экран. */
@@ -483,10 +490,25 @@ open class CanvasViewModel : ViewModel() {
     }
 
     companion object {
-        val PEN_SIZES = listOf(1.2f, 2.5f, 5f)
-        val MARKER_SIZES = listOf(3f, 6f, 12f)
-        val CALLIGRAPHY_SIZES = listOf(2.5f, 4f, 7f)
-        val HIGHLIGHTER_SIZES = listOf(10f, 18f, 28f)
+        /** Миллиметров в одном dp (160 dpi = 25,4 мм / 160). */
+        const val MM_PER_DP = 0.15875f
+
+        /** Толщина по умолчанию, мм (раньше: 2,5 / 6 / 18 / 4 dp). */
+        val DEFAULT_SIZE_MM = mapOf(
+            CanvasTool.PEN to 0.4f, CanvasTool.MARKER to 0.95f, CanvasTool.HIGHLIGHTER to 2.9f, CanvasTool.CALLIGRAPHY to 0.65f,
+        )
+
+        /** Диапазон толщины ползунка, мм; null — у инструмента нет толщины (ластик, лассо). */
+        fun sizeRange(t: CanvasTool): ClosedFloatingPointRange<Float>? = when (t) {
+            CanvasTool.PEN -> 0.1f..2f
+            CanvasTool.MARKER -> 0.3f..4f
+            CanvasTool.HIGHLIGHTER -> 1f..8f
+            CanvasTool.CALLIGRAPHY -> 0.2f..3f
+            else -> null
+        }
+
+        /** Шаг ползунка, мм. */
+        fun sizeStep(t: CanvasTool): Float = if (t == CanvasTool.HIGHLIGHTER) 0.5f else 0.1f
         const val BRUSH_EPSILON = 0.1f
         const val PAGE_MARGIN_DP = 16f
 

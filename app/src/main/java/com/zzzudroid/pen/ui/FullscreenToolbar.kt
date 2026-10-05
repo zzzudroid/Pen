@@ -184,36 +184,4 @@ private fun ColorMenuButton(vm: CanvasViewModel) {
 
 /** Кнопка текущей толщины; по нажатию выпадает ряд из трёх толщин. */
 @Composable
-private fun SizeMenuButton(vm: CanvasViewModel) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    val dots = listOf(7.dp, 12.dp, 18.dp)
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(ButtonSize)) {
-        Box(
-            Modifier.size(ButtonSize).clip(CircleShape).clickable { open = true },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(dots[vm.sizeIndex]).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                dots.forEachIndexed { i, dot ->
-                    val selected = vm.sizeIndex == i
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .border(
-                                width = if (selected) 2.dp else 0.dp,
-                                color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                shape = CircleShape,
-                            )
-                            .clickable { vm.sizeIndex = i; open = false },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(Modifier.size(dot).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface))
-                    }
-                }
-            }
-        }
-    }
-}
+private fun SizeMenuButton(vm: CanvasViewModel) = BrushSizeButton(vm, ButtonSize)
