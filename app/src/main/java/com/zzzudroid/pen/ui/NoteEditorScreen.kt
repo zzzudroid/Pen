@@ -194,13 +194,10 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                 }
             }
             if (fullscreen && meta != null && vm.loadError == null) {
-                FullscreenControls(
-                    canUndo = vm.canUndo,
-                    canRedo = vm.canRedo,
-                    onUndo = vm::undo,
-                    onRedo = vm::redo,
+                FullscreenToolbar(
+                    vm = vm,
                     onExit = { fullscreen = false },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp),
                 )
             }
         }
@@ -270,36 +267,6 @@ private fun drawPdfBackground(
     pdfBorderPaint.strokeWidth = 1f / scale
     canvas.drawRect(rect, pdfBorderPaint)
     return true
-}
-
-/** Маленькая плавающая панель полноэкранного режима: отменить, повторить, выйти. */
-@Composable
-private fun FullscreenControls(
-    canUndo: Boolean,
-    canRedo: Boolean,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onExit: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-        tonalElevation = 3.dp,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onUndo, enabled = canUndo) {
-                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Отменить")
-            }
-            IconButton(onClick = onRedo, enabled = canRedo) {
-                Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Повторить")
-            }
-            IconButton(onClick = onExit) {
-                Icon(Icons.Outlined.FullscreenExit, contentDescription = "Выйти из полноэкранного режима")
-            }
-        }
-    }
 }
 
 /** Прячет системные полосы (статус и навигация) на время [hidden]; по свайпу от края появляются на миг. */
