@@ -7,10 +7,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.zzzudroid.pen.BuildConfig
+import com.zzzudroid.pen.canvas.Bookmark
 import com.zzzudroid.pen.canvas.CanvasViewModel
 import com.zzzudroid.pen.canvas.DebugStress
 import com.zzzudroid.pen.canvas.PageState
 import com.zzzudroid.pen.canvas.PageTemplate
+import com.zzzudroid.pen.canvas.ViewState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,8 +26,19 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
 
     val id: String = checkNotNull(handle["id"]) { "Не передан id тетради" }
 
-    /** Страница, на которой открыть тетрадь (из поиска). */
+    /** Страница, на которой открыть тетрадь (из поиска, ссылки, обратной ссылки). */
     private val startPage: Int = handle["page"] ?: 0
+
+    // Куда прийти из ссылки: закладка доски, прямой вид «масштаб,сдвигX,сдвигY» или точка «x,y» в центр экрана
+    private val startBookmark: String? = handle["bm"]
+    private val startView: ViewState? = parseFloats(handle["view"], 3)?.let { ViewState(it[0], it[1], it[2]) }
+    private val startFocus: List<Float>? = parseFloats(handle["focus"], 2)
+
+    /** Закладки доски. */
+    var bookmarks by mutableStateOf<List<Bookmark>>(emptyList()); private set
+
+    /** Короткое сообщение для показа пользователем (например, «Закладка не найдена»); интерфейс обнуляет после показа. */
+    var notice by mutableStateOf<String?>(null)
 
     var meta by mutableStateOf<NotebookMeta?>(null); private set
     var loadError by mutableStateOf<String?>(null); private set
@@ -67,10 +80,20 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
                         PageState(pm.id, spec = pm.spec, pdfPage = pm.pdfPage).also { it.strokes += pages[pm.id].orEmpty() }
                     })
                 }
+                // Ссылки страниц и закладки доски — из метаданных
+                for (ps in this@NotebookViewModel.pages) ps.links += m.links.filter { it.pageId == ps.id }
+                bookmarks = m.bookmarks
                 meta = m
                 // Открыть на странице из поиска (индекс с нуля), если она есть
                 startPage.takeIf { it in this@NotebookViewModel.pages.indices }?.let { goToPage(it) }
                 loaded = true
+                // Место, куда ведёт ссылка: закладка / вид / точка
+                if (startBookmark != null) {
+                    bookmarks.firstOrNull { it.id == startBookmark }?.let { goToView(it.view) }
+                        ?: run { notice = "Закладка не найдена" }
+                }
+                startView?.let { goToView(it) }
+                startFocus?.let { focusOn(it[0], it[1]) }
                 // Нагрузочный тест (только отладочная сборка)
                 if (BuildConfig.DEBUG) {
                     val n = DebugStress.take()
@@ -142,6 +165,8 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
                 else (p.spec ?: fallback).let { spec -> PageMeta(p.id, spec.width, spec.height, spec.template, p.pdfPage) }
             },
             boardView = view,
+            links = pages.flatMap { it.links },
+            bookmarks = bookmarks,
         )
         meta = newMeta
         val source = pdfSource
@@ -189,6 +214,38 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
         }
     }
 
+    // --- Закладки доски ---
+
+    /** Поставить закладку с запомненным текущим видом доски. */
+    fun addBookmark(name: String): Bookmark {
+        val b = Bookmark(Bookmark.newId(), name.trim().ifEmpty { "Закладка" }, ViewState(viewport.scale, viewport.tx, viewport.ty))
+        bookmarks = bookmarks + b
+        onContentChanged()
+        return b
+    }
+
+    fun renameBookmark(id: String, name: String) {
+        bookmarks = bookmarks.map { if (it.id == id) it.copy(name = name.trim().ifEmpty { it.name }) else it }
+        onContentChanged()
+    }
+
+    fun deleteBookmark(id: String) {
+        bookmarks = bookmarks.filterNot { it.id == id }
+        onContentChanged()
+    }
+
+    /** Перенести вид в место закладки; false — закладки нет. */
+    fun goToBookmark(id: String): Boolean {
+        val b = bookmarks.firstOrNull { it.id == id } ?: return false
+        goToView(b.view)
+        return true
+    }
+
+    private fun goToView(v: ViewState) {
+        restoreView(v.scale, v.tx, v.ty)
+        viewportChanged()
+    }
+
     // У доски нет страниц — добавлять и удалять нечего
     override fun addPageAfterCurrent() {
         if (!isBoard) super.addPageAfterCurrent()
@@ -206,3 +263,7 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
         const val AUTOSAVE_DELAY_MS = 1500L
     }
 }
+
+/** «1.5,2,3» → [1.5, 2, 3], если чисел ровно [count]; иначе null. */
+private fun parseFloats(text: String?, count: Int): List<Float>? =
+    text?.split(',')?.mapNotNull { it.trim().toFloatOrNull() }?.takeIf { it.size == count }

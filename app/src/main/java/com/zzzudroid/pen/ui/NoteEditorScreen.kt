@@ -50,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,7 +76,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
+fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: NotebookViewModel = viewModel()) {
     // Сохранение при сворачивании приложения и при уходе с экрана
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -93,6 +94,14 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
     val meta = vm.meta
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Короткие сообщения модели («Закладка не найдена» и т. п.)
+    LaunchedEffect(vm.notice) {
+        vm.notice?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+            vm.notice = null
+        }
+    }
 
     // Полноэкранный режим: рабочая область на весь экран, без панелей и системных полос
     var fullscreen by rememberSaveable { mutableStateOf(false) }

@@ -105,6 +105,8 @@ dependencies {
 
     // Юнит-тесты логики диагностики — чистый JVM, без эмулятора
     testImplementation(libs.junit)
+    // org.json в юнит-тестах JVM — настоящая реализация (в android.jar методы — заглушки)
+    testImplementation("org.json:json:20240303")
 }
 
 // BUILD_TIME должен отражать реальный момент сборки, а не «залипать» от прошлого

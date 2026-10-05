@@ -13,6 +13,10 @@ import androidx.ink.storage.encode
 import androidx.ink.strokes.Stroke
 import androidx.ink.strokes.StrokeInputBatch
 import com.zzzudroid.pen.canvas.Brushes
+import com.zzzudroid.pen.canvas.ViewState
+import com.zzzudroid.pen.canvas.LinkTarget
+import com.zzzudroid.pen.canvas.DocLink
+import com.zzzudroid.pen.canvas.Bookmark
 import com.zzzudroid.pen.canvas.CanvasTool
 import com.zzzudroid.pen.canvas.PageSpec
 import com.zzzudroid.pen.canvas.PageTemplate
@@ -27,6 +31,7 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.util.UUID
 import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -58,6 +63,12 @@ data class NotebookMeta(
     val kind: DocKind = DocKind.NOTEBOOK,
     /** Последний вид доски; null — открыть с видом по умолчанию. */
     val boardView: BoardView? = null,
+    /** Постоянный идентификатор документа (UUID): не меняется при переименовании, на него ссылаются ссылки. */
+    val docId: String = UUID.randomUUID().toString(),
+    /** Ссылки всех страниц. */
+    val links: List<DocLink> = emptyList(),
+    /** Закладки доски. */
+    val bookmarks: List<Bookmark> = emptyList(),
 ) {
     val isBoard get() = kind == DocKind.BOARD
 
@@ -67,7 +78,7 @@ data class NotebookMeta(
 }
 
 /**
- * Формат .pen, версия 2 — zip:
+ * Формат .pen, версия 3 — zip (v3 добавляет в meta.json docId, links и bookmarks):
  *  meta.json            — метаданные (читаемый JSON), pageInfo — размеры и подложки страниц
  *  pages/<id>.strokes   — штрихи страницы (DataOutputStream, см. [writeStrokes])
  *  thumb.png            — миниатюра первой страницы
@@ -76,7 +87,7 @@ data class NotebookMeta(
  * Доска (kind = "board") — тот же формат: одна страница с размером 0×0 (без границ) и boardView.
  */
 object NotebookFormat {
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
     private const val META = "meta.json"
     private const val THUMB = "thumb.png"
     private const val SOURCE_PDF = "source.pdf"
@@ -124,32 +135,7 @@ object NotebookFormat {
         }
     }
 
-    private fun metaToJson(m: NotebookMeta) = JSONObject().apply {
-        put("formatVersion", FORMAT_VERSION)
-        put("app", "Pen")
-        put("title", m.title)
-        put("template", m.template.id)
-        put("pageWidth", m.pageWidth.toDouble())
-        put("pageHeight", m.pageHeight.toDouble())
-        put("unitsPerMm", PageSpec.UNITS_PER_MM.toDouble())
-        put("created", m.created)
-        put("modified", m.modified)
-        put("pages", JSONArray(m.pageIds))
-        put("hasPdfSource", m.hasPdfSource)
-        put("kind", m.kind.id)
-        m.boardView?.let { v ->
-            put("boardView", JSONObject().put("scale", v.scale.toDouble()).put("tx", v.tx.toDouble()).put("ty", v.ty.toDouble()))
-        }
-        put("pageInfo", JSONArray(m.pages.map { p ->
-            JSONObject().apply {
-                put("id", p.id)
-                put("width", p.width.toDouble())
-                put("height", p.height.toDouble())
-                put("template", p.template.id)
-                p.pdfPage?.let { put("pdfPage", it) }
-            }
-        }))
-    }
+    private fun metaToJson(m: NotebookMeta) = MetaJson.toJson(m)
 
     /** Штрихи страницы: число штрихов, затем для каждого — кисть и входные точки Ink. */
     private fun writeStrokes(strokes: List<Stroke>): ByteArray {
@@ -175,43 +161,7 @@ object NotebookFormat {
     fun readMeta(file: File): NotebookMeta = ZipFile(file).use { zip ->
         val text = zip.getInputStream(zip.getEntry(META) ?: throw IOException("Нет $META"))
             .bufferedReader().readText()
-        val j = JSONObject(text)
-        val version = j.optInt("formatVersion", 1)
-        if (version > FORMAT_VERSION) throw IOException("Файл новой версии формата ($version), обновите приложение")
-        val template = PageTemplate.byId(j.optString("template"))
-        val width = j.getDouble("pageWidth").toFloat()
-        val height = j.getDouble("pageHeight").toFloat()
-        val info = j.optJSONArray("pageInfo")
-        val pages = if (info != null) {
-            List(info.length()) { i ->
-                val p = info.getJSONObject(i)
-                PageMeta(
-                    id = p.getString("id"),
-                    width = p.optDouble("width", width.toDouble()).toFloat(),
-                    height = p.optDouble("height", height.toDouble()).toFloat(),
-                    template = PageTemplate.byId(p.optString("template", template.id)),
-                    pdfPage = if (p.has("pdfPage")) p.getInt("pdfPage") else null,
-                )
-            }
-        } else {
-            // Версия 1: все страницы одного размера и шаблона
-            val ids = j.getJSONArray("pages")
-            List(ids.length()) { PageMeta(ids.getString(it), width, height, template) }
-        }
-        NotebookMeta(
-            title = j.optString("title", file.nameWithoutExtension),
-            template = template,
-            pageWidth = width,
-            pageHeight = height,
-            created = j.optLong("created", file.lastModified()),
-            modified = j.optLong("modified", file.lastModified()),
-            pages = pages,
-            hasPdfSource = zip.getEntry(SOURCE_PDF) != null,
-            kind = DocKind.byId(j.optString("kind", DocKind.NOTEBOOK.id)),
-            boardView = j.optJSONObject("boardView")?.let { v ->
-                BoardView(v.getDouble("scale").toFloat(), v.getDouble("tx").toFloat(), v.getDouble("ty").toFloat())
-            },
-        )
+        MetaJson.parse(text, file.name, file.lastModified(), hasPdfSource = zip.getEntry(SOURCE_PDF) != null)
     }
 
     fun readPages(file: File, meta: NotebookMeta): Map<String, List<Stroke>> = ZipFile(file).use { zip ->

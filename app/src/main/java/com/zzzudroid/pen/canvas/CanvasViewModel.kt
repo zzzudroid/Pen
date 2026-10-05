@@ -266,11 +266,30 @@ open class CanvasViewModel : ViewModel() {
 
     /** Размер поверхности рисования изменился (первый показ, поворот). */
     fun onViewSize(width: Int, height: Int, density: Float) {
+        val sizeChanged = width != viewWidth || height != viewHeight
         viewWidth = width
         viewHeight = height
         this.density = density
-        fitPage()
+        // Вписываем при первом показе и при смене размера (поворот); при возврате на экран («Назад» из ссылки)
+        // размер тот же — вид остаётся таким, каким его оставили
+        if (!viewInitialized || sizeChanged) fitPage()
+        viewInitialized = true
+        pendingFocus?.let { (x, y) -> pendingFocus = null; focusOn(x, y) }
         changed(content = false)
+    }
+
+    private var viewInitialized = false
+    private var pendingFocus: Pair<Float, Float>? = null
+
+    /** Показать точку холста (x, y) в центре экрана, не меняя масштаб; если размер ещё неизвестен — после первого показа. */
+    fun focusOn(x: Float, y: Float) {
+        if (viewWidth == 0) {
+            pendingFocus = x to y
+            return
+        }
+        val vp = viewport
+        vp.panBy(viewWidth / 2f - vp.worldToScreenX(x), viewHeight / 2f - vp.worldToScreenY(y))
+        viewportChanged()
     }
 
     /**

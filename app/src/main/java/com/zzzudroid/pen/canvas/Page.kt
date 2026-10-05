@@ -34,4 +34,7 @@ data class PageSpec(val width: Float, val height: Float, val template: PageTempl
 class PageState(val id: String, var spec: PageSpec? = null, val pdfPage: Int? = null) {
     val strokes = mutableListOf<Stroke>()
     val history = History<CanvasCommand>()
+
+    /** Ссылки страницы (область + цель); хранятся рядом со штрихами. */
+    val links = mutableListOf<DocLink>()
 }
