@@ -25,6 +25,11 @@ data class DocLink(
 
     fun contains(x: Float, y: Float) = x in left..right && y in top..bottom
 
+    /** Ссылка после переноса/масштаба выделения (те же правила, что у штрихов); `id` и цель прежние. */
+    fun transformed(t: SelectionTransform) = copy(
+        left = t.mapX(left), right = t.mapX(right), top = t.mapY(top), bottom = t.mapY(bottom),
+    )
+
     /** Прямоугольник целиком внутри [area] — такая ссылка едет вместе с выделением. */
     fun insideOf(area: Bounds) = left >= area.left && right <= area.right && top >= area.top && bottom <= area.bottom
 

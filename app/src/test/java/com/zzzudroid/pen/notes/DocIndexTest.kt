@@ -77,7 +77,8 @@ class DocIndexTest {
     @Test
     fun `индекс переживает запись в JSON и чтение`() {
         val l = DocLink("l", "p1", 1f, 2f, 3f, 4f, LinkTarget("t", "b", ViewState(0.5f, 1f, 2f)))
-        val docs = listOf(doc("a", "a.pen", links = listOf(l)))
+        val marks = listOf(com.zzzudroid.pen.canvas.Bookmark("b1", "Склад", ViewState(0.1f, 5f, 6f)))
+        val docs = listOf(doc("a", "a.pen", links = listOf(l)).copy(bookmarks = marks))
         assertEquals(docs, DocIndexLogic.fromJson(DocIndexLogic.toJson(docs)))
     }
 

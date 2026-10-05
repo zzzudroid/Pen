@@ -18,6 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.LinkOff
+import androidx.compose.runtime.remember
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,11 +40,16 @@ import com.zzzudroid.pen.canvas.StrokeOps
 /** Сдвиг копии выделения в мировых единицах (4 мм на странице тетради). */
 private const val COPY_OFFSET = 20f
 
-/** Панель действий с выделением лассо; видна, только пока что-то выделено. */
+/**
+ * Панель действий с выделением лассо; видна, только пока что-то выделено.
+ * [onMakeLink] и [onEditLink] — действия со ссылками; null — ссылки на этом экране выключены.
+ */
 @Composable
-fun SelectionBar(vm: CanvasViewModel) {
+fun SelectionBar(vm: CanvasViewModel, onMakeLink: (() -> Unit)? = null, onEditLink: (() -> Unit)? = null) {
     val selection = vm.selection
     if (selection.isEmpty()) return
+    // Ссылки под рамкой выделения; пересчитываем при любом изменении модели
+    val links = remember(vm.version, selection) { if (onMakeLink != null) vm.selectedLinks() else emptyList() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -67,6 +75,22 @@ fun SelectionBar(vm: CanvasViewModel) {
             Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
             Spacer(Modifier.width(6.dp))
             Text("Удалить")
+        }
+
+        if (onMakeLink != null) {
+            TextButton(onClick = onMakeLink) {
+                Icon(Icons.Outlined.Link, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Сделать ссылкой")
+            }
+            if (links.isNotEmpty() && onEditLink != null) {
+                TextButton(onClick = onEditLink) { Text("Изменить ссылку") }
+                TextButton(onClick = { vm.removeLinks(links) }) {
+                    Icon(Icons.Outlined.LinkOff, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Удалить ссылку")
+                }
+            }
         }
 
         VerticalDivider(Modifier.padding(horizontal = 4.dp).size(1.dp, 32.dp))

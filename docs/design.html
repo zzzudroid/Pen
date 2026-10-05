@@ -231,13 +231,16 @@ blockquote p{margin:0}
 <li>Каждое изменение — команда (<code>AddStroke</code>, <code>Erase</code>, <code>Transform</code>…) → бесконечный undo/redo и в будущем синхронизация через журнал операций.</li>
 <li>Файл документа: <code>document.pen</code> = zip { <code>meta.json</code>, <code>pages/*.pb</code>, <code>assets/*</code>, <code>thumb.png</code> } — легко бэкапить и переносить.</li>
 </ul>
-<h3>Формат <code>.pen</code> v2 (реализовано; v1 читается)</h3>
+<h3>Формат <code>.pen</code> v3 (реализовано; v1 и v2 читаются)</h3>
 <p>Единицы мира — 5 ед./мм; страница A4 (книжная) = 1050 × 1485.</p>
 <pre><code>&lt;название&gt;.pen  (zip, Documents/Pen/)
  ├─ meta.json            — formatVersion, title, template (blank|lined|grid|dots),
  │                         pageWidth, pageHeight, unitsPerMm, created, modified, pages: [id…],
  │                         pageInfo: [{id, width, height, template, pdfPage?}], hasPdfSource   (v2)
  │                         kind: notebook|board, boardView: {scale, tx, ty}   (доска: одна страница 0×0)
+                         docId (UUID — постоянный идентификатор; у v1/v2 выводится из имени файла), v3:
+                         links: [{id, pageId, rect, docId, bm?, view?}] — ссылки на другие документы,
+                         bookmarks: [{id, name, view}] — закладки-места доски
  ├─ pages/&lt;id&gt;.strokes   — штрихи страницы (бинарный, DataOutputStream)
  ├─ source.pdf           — исходный PDF для тетрадей-разметок (v2, необязателен)
  └─ thumb.png            — миниатюра первой страницы, 300 px по ширине
@@ -246,6 +249,10 @@ blockquote p{margin:0}
 <code>int</code> цвет ARGB, <code>float</code> размер, <code>float</code> epsilon, <code>int</code> длина + байты <code>StrokeInputBatch</code> (<code>androidx.ink.storage</code>).
 Кисть хранится своими полями, а не сериализованной <code>BrushFamily</code>, — формат не зависит от внутреннего устройства
 стоковых кистей Ink. Запись атомарная: <code>&lt;имя&gt;.pen.tmp</code> → <code>fsync</code> → переименование.</p>
+<p>Ссылки между документами: область ссылки (прямоугольник в мировых координатах страницы) хранит <code>docId</code> цели, а не имя файла,
+поэтому переименование цели ссылку не ломает. Цель — документ целиком, закладка доски или конкретный вид. Индекс
+<code>filesDir/docindex.json</code> (идентификатор → файл, закладки, исходящие ссылки) обновляется инкрементально по времени и размеру
+файла; из него же строятся обратные ссылки («Откуда ссылаются»). Недоступная цель — «Документ недоступен», ссылка рисуется серой.</p>
 <h2>6. Ввод и поведение пера</h2>
 <ol>
 <li><strong>Разделение инструментов:</strong> <code>TOOL_TYPE_STYLUS</code> рисует, <code>TOOL_TYPE_FINGER</code> — пан/зум/жесты, <code>TOOL_TYPE_ERASER</code> (если перо его отдаёт) — ластик.</li>

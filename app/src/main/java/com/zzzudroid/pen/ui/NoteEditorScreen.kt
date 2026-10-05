@@ -12,6 +12,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material.icons.outlined.CropFree
+import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
 import android.graphics.Canvas
@@ -66,7 +68,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zzzudroid.pen.canvas.Bounds
+import com.zzzudroid.pen.canvas.DocLink
 import com.zzzudroid.pen.canvas.DrawingSurface
+import com.zzzudroid.pen.canvas.StrokeOps
+import com.zzzudroid.pen.canvas.ViewState
+import com.zzzudroid.pen.notes.DocIndex
+import com.zzzudroid.pen.notes.LinkResolution
+import com.zzzudroid.pen.notes.LinkRouting
 import com.zzzudroid.pen.canvas.PageSpec
 import com.zzzudroid.pen.notes.PdfPageCache
 import java.io.File
@@ -82,6 +91,8 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) vm.saveNow()
+            // Вернулись из другого документа (по ссылке): подхватить его правки, если он менял этот файл
+            if (event == Lifecycle.Event.ON_RESUME) vm.reloadIfChangedOnDisk()
         }
         lifecycle.addObserver(observer)
         onDispose {
@@ -91,9 +102,44 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
     }
 
     var confirmDeletePage by remember { mutableStateOf(false) }
+    var showBookmarks by remember { mutableStateOf(false) }
+    var showBacklinks by remember { mutableStateOf(false) }
     val meta = vm.meta
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Ссылки: диалог выбора цели (1 — новая ссылка, 2 — сменить цель) и область новой ссылки
+    var linkDialog by remember { mutableStateOf(0) }
+    var linkArea by remember { mutableStateOf<Bounds?>(null) }
+    var dimmed by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    // Недоступные цели ссылок рисуем приглушённо
+    LaunchedEffect(vm.version, vm.pageIndex) {
+        val links = vm.page.links
+        dimmed = if (links.isEmpty()) emptySet() else {
+            DocIndex.refresh(context)
+            links.filter { DocIndex.find(it.target.docId) == null }.map { it.id }.toSet()
+        }
+    }
+
+    // Переход по ссылке: в этом же документе — на месте, иначе открыть цель
+    fun openLink(link: DocLink) {
+        val t = link.target
+        if (t.docId == vm.meta?.docId) {
+            when {
+                t.bookmarkId != null -> if (!vm.goToBookmark(t.bookmarkId)) vm.notice = "Закладка не найдена"
+                t.view != null -> vm.showView(t.view)
+            }
+            return
+        }
+        scope.launch {
+            DocIndex.refresh(context)
+            when (val r = LinkRouting.resolve(t, DocIndex.find(t.docId))) {
+                is LinkResolution.Open -> onNavigate(Routes.note(r.destination.fileName, 0, r.destination.bookmarkId, r.destination.view))
+                is LinkResolution.Missing -> vm.notice = r.message
+            }
+        }
+    }
 
     // Короткие сообщения модели («Закладка не найдена» и т. п.)
     LaunchedEffect(vm.notice) {
@@ -154,6 +200,17 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                             contentDescription = if (vm.isBoard) "Вернуться в начало" else "Страница целиком",
                         )
                     }
+                    // Закладки — только у доски; обратные ссылки — у любого документа
+                    if (meta != null && vm.isBoard) {
+                        IconButton(onClick = { showBookmarks = true }) {
+                            Icon(Icons.Outlined.Bookmarks, contentDescription = "Закладки")
+                        }
+                    }
+                    if (meta != null) {
+                        IconButton(onClick = { showBacklinks = true }) {
+                            Icon(Icons.Outlined.Link, contentDescription = "Откуда ссылаются")
+                        }
+                    }
                     IconButton(onClick = { fullscreen = true }) {
                         Icon(Icons.Outlined.Fullscreen, contentDescription = "На весь экран")
                     }
@@ -171,7 +228,15 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                 meta == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else -> Column(Modifier.fillMaxSize()) {
                     if (!fullscreen) CanvasToolbar(vm)
-                    SelectionBar(vm)
+                    SelectionBar(
+                        vm,
+                        onMakeLink = {
+                            // Небольшое поле вокруг выделенного, чтобы попасть пальцем (1 мм = 5 ед.)
+                            linkArea = StrokeOps.bounds(vm.selection)?.let { Bounds(it.left - 5f, it.top - 5f, it.right + 5f, it.bottom + 5f) }
+                            if (linkArea != null) linkDialog = 1
+                        },
+                        onEditLink = { linkDialog = 2 },
+                    )
                     AndroidView(
                         factory = { ctx ->
                             DrawingSurface(ctx, vm).also { surface ->
@@ -189,6 +254,8 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                             vm.version
                             // Плавающая панель слева в полноэкранном режиме — мини-карта сдвигается правее неё
                             surface.minimapInsetStartDp = if (fullscreen) 68f else 0f
+                            surface.onLinkClick = ::openLink
+                            surface.dimmedLinks = dimmed
                             surface.refresh()
                         },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -214,6 +281,32 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                     modifier = Modifier.align(Alignment.CenterStart).padding(8.dp),
                 )
             }
+        }
+    }
+
+    if (linkDialog != 0) {
+        LinkTargetDialog(
+            currentDocId = meta?.docId,
+            currentBookmarks = vm.bookmarks,
+            currentView = if (vm.isBoard) ViewState(vm.viewport.scale, vm.viewport.tx, vm.viewport.ty) else null,
+            onDismiss = { linkDialog = 0 },
+            onPick = { target ->
+                if (linkDialog == 1) linkArea?.let { vm.addLink(it, target) } else vm.retargetLinks(vm.selectedLinks(), target)
+                linkDialog = 0
+            },
+        )
+    }
+    if (showBookmarks) BookmarksSheet(vm, onDismiss = { showBookmarks = false })
+    if (showBacklinks) {
+        meta?.docId?.let { docId ->
+            BacklinksSheet(
+                docId = docId,
+                onOpen = { row ->
+                    showBacklinks = false
+                    onNavigate(Routes.note(row.fileName, page = row.page, focus = row.focusX to row.focusY))
+                },
+                onDismiss = { showBacklinks = false },
+            )
         }
     }
 

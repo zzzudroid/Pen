@@ -73,5 +73,11 @@ adb logcat -s PenDiag
 - Проверка на планшете без пера: `adb shell input stylus swipe …` рисует штрихи (работает, пока настоящее перо не висит над экраном — иначе система считает касания ладонью); палец рисовать не умеет, только листает или (включив «стирать пальцем») стирает;
   скриншот `screencap` не показывает штрих в процессе (он в front-buffer) — снимать после паузы.
 - API androidx.ink сверять по фактическим классам библиотеки (javap), документация к alpha-версиям расходится с 1.0.
+- Ссылки между документами (формат `.pen` v3): `canvas/Link.kt` (`DocLink`, `LinkTarget`, `Bookmark`, `ViewState`), команды истории
+  `LinkAdded/LinkRemoved/LinkChanged`, слой `LinksLayer` в `DrawingSurface` (тап пальцем → `onLinkClick`); `notes/MetaJson.kt`
+  (чистая сериализация meta, `docId`), `notes/DocIndex.kt` (индекс `filesDir/docindex.json`, обратные ссылки), `notes/LinkRouting.kt`,
+  `ui/LinkTargetDialog.kt`, `BookmarksSheet`, `BacklinksSheet`. Маршрут `note/{id}?page&bm&view&focus`. `NotebookViewModel.reloadIfChangedOnDisk()`
+  на ON_RESUME — чтобы цепочка A→B→A не затёрла чужие правки.
+- `InProgressStrokesView`: после `finishStroke` вызывать `requestHandoff()`, иначе изредка штрих не завершается до внешнего события.
 - `BuildConfig.BUILD_TIME / GIT_HASH / GIT_DIRTY` — для экрана «О программе»; генерация BuildConfig
   никогда не считается up-to-date.

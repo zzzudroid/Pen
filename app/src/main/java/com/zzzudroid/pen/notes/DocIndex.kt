@@ -1,6 +1,7 @@
 package com.zzzudroid.pen.notes
 
 import android.content.Context
+import com.zzzudroid.pen.canvas.Bookmark
 import com.zzzudroid.pen.canvas.DocLink
 import com.zzzudroid.pen.canvas.LinkTarget
 import com.zzzudroid.pen.canvas.ViewState
@@ -24,6 +25,8 @@ data class IndexedDoc(
     val pageIds: List<String>,
     /** Исходящие ссылки документа. */
     val links: List<DocLink>,
+    /** Закладки доски — чтобы ссылку можно было направить на закладку, не открывая доску. */
+    val bookmarks: List<Bookmark> = emptyList(),
 )
 
 /** Обратная ссылка: откуда на документ ссылаются. */
@@ -78,6 +81,10 @@ object DocIndexLogic {
             put("title", d.title)
             put("kind", d.kind.id)
             put("pages", JSONArray(d.pageIds))
+            put("bookmarks", JSONArray(d.bookmarks.map { b ->
+                JSONObject().put("id", b.id).put("name", b.name)
+                    .put("view", JSONArray(listOf(b.view.scale, b.view.tx, b.view.ty).map { v -> v.toDouble() }))
+            }))
             put("links", JSONArray(d.links.map { l ->
                 JSONObject().apply {
                     put("id", l.id)
@@ -97,12 +104,18 @@ object DocIndexLogic {
             val d = arr.getJSONObject(i)
             val pages = d.getJSONArray("pages")
             val links = d.getJSONArray("links")
+            val marks = d.optJSONArray("bookmarks")
             IndexedDoc(
                 docId = d.getString("docId"),
                 stamp = FileStamp(d.getString("name"), d.getLong("lm"), d.getLong("len")),
                 title = d.getString("title"),
                 kind = DocKind.byId(d.optString("kind")),
                 pageIds = List(pages.length()) { pages.getString(it) },
+                bookmarks = if (marks == null) emptyList() else List(marks.length()) { k ->
+                    val b = marks.getJSONObject(k)
+                    val v = b.getJSONArray("view")
+                    Bookmark(b.getString("id"), b.getString("name"), ViewState(v.getDouble(0).toFloat(), v.getDouble(1).toFloat(), v.getDouble(2).toFloat()))
+                },
                 links = List(links.length()) { k ->
                     val l = links.getJSONObject(k)
                     val r = l.getJSONArray("rect")
@@ -123,7 +136,7 @@ object DocIndexLogic {
 
     /** Запись индекса из метаданных документа. */
     fun entryOf(meta: NotebookMeta, stamp: FileStamp) =
-        IndexedDoc(meta.docId, stamp, meta.title, meta.kind, meta.pageIds, meta.links)
+        IndexedDoc(meta.docId, stamp, meta.title, meta.kind, meta.pageIds, meta.links, meta.bookmarks)
 }
 
 /**

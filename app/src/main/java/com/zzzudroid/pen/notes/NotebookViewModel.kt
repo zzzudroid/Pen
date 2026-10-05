@@ -60,30 +60,8 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     init {
         viewModelScope.launch {
             try {
-                val (m, pages, source) = withContext(Dispatchers.IO) {
-                    // Ждём возможное незаконченное сохранение этой же тетради
-                    NotebookStore.writeLock.withLock {
-                        val f = NotebookStore.file(id)
-                        val m = NotebookFormat.readMeta(f)
-                        val source = if (m.hasPdfSource) PdfSources.extract(id) else null
-                        Triple(m, NotebookFormat.readPages(f, m), source)
-                    }
-                }
-                pdfSource = source
-                if (m.isBoard) {
-                    // Доска: одна безграничная страница (pageSpec = null), вид — как при закрытии
-                    val pm = m.pages.first()
-                    replacePages(null, listOf(PageState(pm.id).also { it.strokes += pages[pm.id].orEmpty() }))
-                    m.boardView?.let { restoreView(it.scale, it.tx, it.ty) }
-                } else {
-                    replacePages(m.pageSpec, m.pages.map { pm ->
-                        PageState(pm.id, spec = pm.spec, pdfPage = pm.pdfPage).also { it.strokes += pages[pm.id].orEmpty() }
-                    })
-                }
-                // Ссылки страниц и закладки доски — из метаданных
-                for (ps in this@NotebookViewModel.pages) ps.links += m.links.filter { it.pageId == ps.id }
-                bookmarks = m.bookmarks
-                meta = m
+                val (m, pages, source) = readFromDisk()
+                applyLoaded(m, pages, source)
                 // Открыть на странице из поиска (индекс с нуля), если она есть
                 startPage.takeIf { it in this@NotebookViewModel.pages.indices }?.let { goToPage(it) }
                 loaded = true
@@ -109,6 +87,65 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
             }
         }
     }
+
+    /** Отпечаток файла (время изменения, размер) на момент последнего чтения или записи нами. */
+    @Volatile private var diskStamp: Pair<Long, Long>? = null
+
+    /** Прочитать документ с диска (после возможной незаконченной записи) и запомнить отпечаток файла. */
+    private suspend fun readFromDisk(): Triple<NotebookMeta, Map<String, List<androidx.ink.strokes.Stroke>>, File?> =
+        withContext(Dispatchers.IO) {
+            NotebookStore.writeLock.withLock {
+                val f = NotebookStore.file(id)
+                val m = NotebookFormat.readMeta(f)
+                val source = if (m.hasPdfSource) PdfSources.extract(id) else null
+                val pages = NotebookFormat.readPages(f, m)
+                diskStamp = f.lastModified() to f.length()
+                Triple(m, pages, source)
+            }
+        }
+
+    /** Применить прочитанное: страницы со штрихами и ссылками, закладки, метаданные. */
+    private fun applyLoaded(m: NotebookMeta, pages: Map<String, List<androidx.ink.strokes.Stroke>>, source: File?) {
+        pdfSource = source
+        if (m.isBoard) {
+            // Доска: одна безграничная страница (pageSpec = null), вид — как при закрытии
+            val pm = m.pages.first()
+            replacePages(null, listOf(PageState(pm.id).also { it.strokes += pages[pm.id].orEmpty() }))
+            m.boardView?.let { restoreView(it.scale, it.tx, it.ty) }
+        } else {
+            replacePages(m.pageSpec, m.pages.map { pm ->
+                PageState(pm.id, spec = pm.spec, pdfPage = pm.pdfPage).also { it.strokes += pages[pm.id].orEmpty() }
+            })
+        }
+        // Ссылки страниц и закладки доски — из метаданных
+        for (ps in this.pages) ps.links += m.links.filter { it.pageId == ps.id }
+        bookmarks = m.bookmarks
+        meta = m
+    }
+
+    /**
+     * Документ могли изменить другой экземпляр редактора (ссылка вела на него, а потом обратно) или внешняя синхронизация.
+     * Если файл на диске не тот, что мы читали или писали, и у нас нет несохранённых правок — перечитать, чтобы не затереть чужие изменения.
+     */
+    fun reloadIfChangedOnDisk() {
+        if (!loaded || dirty) return
+        viewModelScope.launch {
+            val f = NotebookStore.file(id)
+            val stamp = withContext(Dispatchers.IO) { f.lastModified() to f.length() }
+            if (stamp == diskStamp) return@launch
+            try {
+                val keepPage = pageIndex
+                val (m, pages, source) = readFromDisk()
+                applyLoaded(m, pages, source)
+                if (keepPage in this@NotebookViewModel.pages.indices) goToPage(keepPage)
+            } catch (e: Exception) {
+                Log.w(TAG, "Не удалось перечитать $id", e)
+            }
+        }
+    }
+
+    /** Перенести вид в [v] (для ссылки на место того же документа). */
+    fun showView(v: ViewState) = goToView(v)
 
     override fun onContentChanged() {
         if (!loaded) return
@@ -178,6 +215,7 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
                 NotebookStore.writeLock.withLock {
                     val t0 = System.nanoTime()
                     NotebookFormat.write(file, newMeta, snapshot, source)
+                    diskStamp = file.lastModified() to file.length()
                     val t1 = System.nanoTime()
                     lastPenSaveMs = (t1 - t0) / 1_000_000
                     // PDF-копия для ПК; её сбой не делает .pen несохранённым. Автосохранение на больших документах
