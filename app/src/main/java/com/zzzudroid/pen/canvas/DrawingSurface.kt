@@ -195,8 +195,8 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     }
 
     private fun startPen(ev: MotionEvent, i: Int, id: Int) {
-        val eraser = ev.getToolType(i) == MotionEvent.TOOL_TYPE_ERASER ||
-            (ev.buttonState and STYLUS_ERASER_BUTTONS) != 0
+        // Кнопки пера приложением не используются вообще — только инструмент на панели и ластик-инструмент пера
+        val eraser = ev.getToolType(i) == MotionEvent.TOOL_TYPE_ERASER
         // Лассо работает и за пределами листа; ластик пера стирает и в режиме лассо
         if (!eraser && vm.tool == CanvasTool.LASSO) {
             if (lassoPointer == null) startLasso(ev.getX(i), ev.getY(i), id)
@@ -710,9 +710,6 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     }
 
     companion object {
-        /** Кнопки пера, при удержании которых перо стирает. Уточнить по отчёту диагностики. */
-        const val STYLUS_ERASER_BUTTONS = MotionEvent.BUTTON_STYLUS_PRIMARY or MotionEvent.BUTTON_STYLUS_SECONDARY
-
         const val ERASER_RADIUS_DP = 10f
         const val TAP_MAX_MS = 250L
         const val TAP_MAX_TRAVEL_DP = 24f
