@@ -72,6 +72,26 @@ object NotebookStore {
         return name
     }
 
+    /** Создать пустую бесконечную доску; возвращает id (имя файла). */
+    fun createBoard(title: String): String {
+        root.mkdirs()
+        val name = FileNames.unique(title) { candidate -> nameTaken(candidate) }
+        val now = System.currentTimeMillis()
+        // Одна страница без границ: размер 0×0 означает безграничный холст
+        val meta = NotebookMeta(
+            title.trim().ifEmpty { "Без названия" }, PageTemplate.BLANK, 0f, 0f, now, now,
+            listOf(PageMeta(CanvasViewModel.newPageId(), 0f, 0f, PageTemplate.BLANK)),
+            kind = DocKind.BOARD,
+        )
+        NotebookFormat.write(File(root, name), meta, emptyMap())
+        try {
+            PdfExporter.write(pdfFile(name), meta, emptyMap())
+        } catch (e: Exception) {
+            Log.w(TAG, "Не удалось создать PDF для $name", e)
+        }
+        return name
+    }
+
     /** Переименовать: меняется и название в meta.json, и имя файла. Возвращает новый id. */
     fun rename(id: String, newTitle: String): String {
         val src = file(id)

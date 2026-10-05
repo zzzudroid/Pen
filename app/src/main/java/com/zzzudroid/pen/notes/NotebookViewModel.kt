@@ -8,6 +8,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.zzzudroid.pen.canvas.CanvasViewModel
 import com.zzzudroid.pen.canvas.PageState
+import com.zzzudroid.pen.canvas.PageTemplate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,6 +32,9 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     /** Ошибка автоэкспорта PDF — отдельно: .pen при этом сохранён. */
     var pdfError by mutableStateOf<String?>(null); private set
 
+    /** Документ — бесконечная доска (одна страница без границ, без добавления страниц). */
+    val isBoard: Boolean get() = meta?.isBoard == true
+
     private var loaded = false
     private var dirty = false
     private var saveJob: Job? = null
@@ -48,9 +52,16 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
                     }
                 }
                 pdfSource = source
-                replacePages(m.pageSpec, m.pages.map { pm ->
-                    PageState(pm.id, spec = pm.spec, pdfPage = pm.pdfPage).also { it.strokes += pages[pm.id].orEmpty() }
-                })
+                if (m.isBoard) {
+                    // Доска: одна безграничная страница (pageSpec = null), вид — как при закрытии
+                    val pm = m.pages.first()
+                    replacePages(null, listOf(PageState(pm.id).also { it.strokes += pages[pm.id].orEmpty() }))
+                    m.boardView?.let { restoreView(it.scale, it.tx, it.ty) }
+                } else {
+                    replacePages(m.pageSpec, m.pages.map { pm ->
+                        PageState(pm.id, spec = pm.spec, pdfPage = pm.pdfPage).also { it.strokes += pages[pm.id].orEmpty() }
+                    })
+                }
                 meta = m
                 loaded = true
             } catch (e: Exception) {
@@ -91,16 +102,19 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     private fun startSave(): Job? {
         saveJob?.cancel()
         val m = meta ?: return null
-        if (!dirty) return null
+        // У доски сохраняем и вид: сдвиг/масштаб без правок тоже стоит записать
+        val view = if (m.isBoard) BoardView(viewport.scale, viewport.tx, viewport.ty) else null
+        if (!dirty && view == m.boardView) return null
         dirty = false
         val snapshot = pages.associate { it.id to it.strokes.toList() }
         val fallback = m.pageSpec
         val newMeta = m.copy(
             modified = System.currentTimeMillis(),
             pages = pages.map { p ->
-                val spec = p.spec ?: fallback
-                PageMeta(p.id, spec.width, spec.height, spec.template, p.pdfPage)
+                if (m.isBoard) PageMeta(p.id, 0f, 0f, PageTemplate.BLANK)
+                else (p.spec ?: fallback).let { spec -> PageMeta(p.id, spec.width, spec.height, spec.template, p.pdfPage) }
             },
+            boardView = view,
         )
         meta = newMeta
         val source = pdfSource
@@ -132,6 +146,13 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
             }
         }
     }
+
+    // У доски нет страниц — добавлять и удалять нечего
+    override fun addPageAfterCurrent() {
+        if (!isBoard) super.addPageAfterCurrent()
+    }
+
+    override fun deleteCurrentPage(): Boolean = if (isBoard) false else super.deleteCurrentPage()
 
     override fun onCleared() {
         saveNow()

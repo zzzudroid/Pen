@@ -1,5 +1,7 @@
 package com.zzzudroid.pen.notes
 
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -7,6 +9,7 @@ import android.graphics.pdf.PdfDocument
 import androidx.ink.geometry.outlinesToPath
 import androidx.ink.strokes.Stroke
 import com.zzzudroid.pen.canvas.PageSpec
+import com.zzzudroid.pen.canvas.StrokeOps
 import com.zzzudroid.pen.canvas.drawPage
 import java.io.File
 import java.io.FileOutputStream
@@ -36,7 +39,9 @@ object PdfExporter {
         val doc = PdfDocument()
         val tmp = File(pdf.parentFile, pdf.name + ".tmp")
         try {
-            meta.pages.forEachIndexed { index, pm ->
+            if (meta.isBoard) {
+                writeBoardPage(doc, pages[meta.pageIds.firstOrNull()].orEmpty(), paint)
+            } else meta.pages.forEachIndexed { index, pm ->
                 val spec = pm.spec
                 val widthPt = (spec.width * POINTS_PER_UNIT).roundToInt().coerceAtLeast(1)
                 val heightPt = (spec.height * POINTS_PER_UNIT).roundToInt().coerceAtLeast(1)
@@ -58,15 +63,7 @@ object PdfExporter {
                     c.scale(POINTS_PER_UNIT, POINTS_PER_UNIT)
                     drawPage(c, spec, POINTS_PER_UNIT)
                 }
-                for (stroke in pages[pm.id].orEmpty()) {
-                    paint.color = stroke.brush.colorIntArgb
-                    val shape = stroke.shape
-                    for (group in 0 until shape.getRenderGroupCount()) {
-                        val path = shape.outlinesToPath(group)
-                        path.fillType = Path.FillType.WINDING
-                        c.drawPath(path, paint)
-                    }
-                }
+                drawStrokes(c, pages[pm.id].orEmpty(), paint)
                 doc.finishPage(page)
             }
             FileOutputStream(tmp).use { fos ->
@@ -83,6 +80,33 @@ object PdfExporter {
         if (!tmp.renameTo(pdf)) {
             tmp.delete()
             throw IOException("Не удалось заменить ${pdf.name}")
+        }
+    }
+
+    /** Доска — одна страница по границам содержимого с полями 10 мм, белый фон. */
+    private fun writeBoardPage(doc: PdfDocument, strokes: List<Stroke>, paint: Paint) {
+        val layout = BoardLayout.exportPage(StrokeOps.bounds(strokes))
+        val widthPt = (layout.width * POINTS_PER_UNIT).roundToInt().coerceAtLeast(1)
+        val heightPt = (layout.height * POINTS_PER_UNIT).roundToInt().coerceAtLeast(1)
+        val page = doc.startPage(PdfDocument.PageInfo.Builder(widthPt, heightPt, 1).create())
+        val c = page.canvas
+        c.drawColor(Color.WHITE)
+        c.scale(POINTS_PER_UNIT, POINTS_PER_UNIT)
+        c.translate(layout.offsetX, layout.offsetY)
+        drawStrokes(c, strokes, paint)
+        doc.finishPage(page)
+    }
+
+    /** Штрихи векторными контурами Ink с цветом и прозрачностью кисти. */
+    private fun drawStrokes(c: Canvas, strokes: List<Stroke>, paint: Paint) {
+        for (stroke in strokes) {
+            paint.color = stroke.brush.colorIntArgb
+            val shape = stroke.shape
+            for (group in 0 until shape.getRenderGroupCount()) {
+                val path = shape.outlinesToPath(group)
+                path.fillType = Path.FillType.WINDING
+                c.drawPath(path, paint)
+            }
         }
     }
 }

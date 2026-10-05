@@ -3,6 +3,8 @@ package com.zzzudroid.pen.notes
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Matrix
 import androidx.ink.brush.Brush
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
@@ -14,6 +16,7 @@ import com.zzzudroid.pen.canvas.Brushes
 import com.zzzudroid.pen.canvas.CanvasTool
 import com.zzzudroid.pen.canvas.PageSpec
 import com.zzzudroid.pen.canvas.PageTemplate
+import com.zzzudroid.pen.canvas.StrokeOps
 import com.zzzudroid.pen.canvas.drawPage
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,7 +54,13 @@ data class NotebookMeta(
     val pages: List<PageMeta>,
     /** В zip лежит исходный PDF (source.pdf) — подложка страниц с pdfPage. */
     val hasPdfSource: Boolean = false,
+    /** Тетрадь или бесконечная доска (у доски одна страница без границ). */
+    val kind: DocKind = DocKind.NOTEBOOK,
+    /** Последний вид доски; null — открыть с видом по умолчанию. */
+    val boardView: BoardView? = null,
 ) {
+    val isBoard get() = kind == DocKind.BOARD
+
     /** Общий размер и шаблон тетради — для новых обычных страниц. */
     val pageSpec get() = PageSpec(pageWidth, pageHeight, template)
     val pageIds: List<String> get() = pages.map { it.id }
@@ -64,6 +73,7 @@ data class NotebookMeta(
  *  thumb.png            — миниатюра первой страницы
  *  source.pdf           — исходный PDF, если тетрадь создана импортом PDF
  * Версия 1 отличается отсутствием pageInfo и source.pdf — читается как тетрадь с общим размером страниц.
+ * Доска (kind = "board") — тот же формат: одна страница с размером 0×0 (без границ) и boardView.
  */
 object NotebookFormat {
     const val FORMAT_VERSION = 2
@@ -93,7 +103,9 @@ object NotebookFormat {
                     zip.closeEntry()
                 }
                 zip.putNextEntry(ZipEntry(THUMB))
-                val thumb = renderThumbnail(finalMeta.pages.firstOrNull(), finalMeta.pageSpec, pages[finalMeta.pageIds.firstOrNull()].orEmpty(), pdfSource)
+                val firstStrokes = pages[finalMeta.pageIds.firstOrNull()].orEmpty()
+                val thumb = if (finalMeta.isBoard) renderBoardThumbnail(firstStrokes)
+                else renderThumbnail(finalMeta.pages.firstOrNull(), finalMeta.pageSpec, firstStrokes, pdfSource)
                 thumb.compress(Bitmap.CompressFormat.PNG, 100, zip)
                 thumb.recycle()
                 zip.closeEntry()
@@ -124,6 +136,10 @@ object NotebookFormat {
         put("modified", m.modified)
         put("pages", JSONArray(m.pageIds))
         put("hasPdfSource", m.hasPdfSource)
+        put("kind", m.kind.id)
+        m.boardView?.let { v ->
+            put("boardView", JSONObject().put("scale", v.scale.toDouble()).put("tx", v.tx.toDouble()).put("ty", v.ty.toDouble()))
+        }
         put("pageInfo", JSONArray(m.pages.map { p ->
             JSONObject().apply {
                 put("id", p.id)
@@ -191,6 +207,10 @@ object NotebookFormat {
             modified = j.optLong("modified", file.lastModified()),
             pages = pages,
             hasPdfSource = zip.getEntry(SOURCE_PDF) != null,
+            kind = DocKind.byId(j.optString("kind", DocKind.NOTEBOOK.id)),
+            boardView = j.optJSONObject("boardView")?.let { v ->
+                BoardView(v.getDouble("scale").toFloat(), v.getDouble("tx").toFloat(), v.getDouble("ty").toFloat())
+            },
         )
     }
 
@@ -239,6 +259,37 @@ object NotebookFormat {
     // --- Миниатюра ---
 
     private val renderer by lazy { CanvasStrokeRenderer.create() }
+
+    /** Миниатюра доски 300×400: содержимое вписано с полями; пустая доска — точечная сетка. */
+    private fun renderBoardThumbnail(strokes: List<Stroke>): Bitmap {
+        val w = THUMB_WIDTH
+        val h = THUMB_WIDTH * 4 / 3
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(BOARD_BACKGROUND)
+        val content = StrokeOps.bounds(strokes)
+        if (content == null) {
+            val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BOARD_DOT }
+            val step = 20f
+            var y = step
+            while (y < h) {
+                var x = step
+                while (x < w) { c.drawCircle(x, y, 1.5f, dot); x += step }
+                y += step
+            }
+            return bmp
+        }
+        val fit = BoardLayout.fit(content, w.toFloat(), h.toFloat())
+        val m = Matrix().apply {
+            setScale(fit.scale, fit.scale)
+            postTranslate(fit.dx, fit.dy)
+        }
+        for (s in strokes) renderer.draw(c, s, m)
+        return bmp
+    }
+
+    private val BOARD_BACKGROUND = Color.rgb(0xFB, 0xFA, 0xF7)
+    private val BOARD_DOT = Color.rgb(0xC8, 0xC4, 0xBC)
 
     private fun renderThumbnail(first: PageMeta?, fallback: PageSpec, strokes: List<Stroke>, pdfSource: File?): Bitmap {
         val spec = first?.spec ?: fallback

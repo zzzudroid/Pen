@@ -206,7 +206,7 @@ open class CanvasViewModel : ViewModel() {
     }
 
     /** Добавить пустую страницу после текущей и перейти на неё. */
-    fun addPageAfterCurrent() {
+    open fun addPageAfterCurrent() {
         selection = emptyList()
         // Новая страница — обычный лист с шаблоном тетради, без PDF-подложки
         pages.add(pageIndex + 1, PageState(newPageId(), spec = defaultPageSpec))
@@ -216,7 +216,7 @@ open class CanvasViewModel : ViewModel() {
     }
 
     /** Удалить текущую страницу (последнюю удалить нельзя). */
-    fun deleteCurrentPage(): Boolean {
+    open fun deleteCurrentPage(): Boolean {
         if (pages.size <= 1) return false
         selection = emptyList()
         pages.removeAt(pageIndex)
@@ -262,6 +262,12 @@ open class CanvasViewModel : ViewModel() {
     }
 
     fun viewportChanged() = changed(content = false)
+
+    /** Восстановить сохранённый вид (доска открывается там, где её закрыли). */
+    protected fun restoreView(scale: Float, tx: Float, ty: Float) {
+        viewport.set(scale, tx, ty)
+        changed(content = false)
+    }
 
     /** Кисть для нового штриха. Размеры заданы в dp при масштабе 100%. */
     fun brush(density: Float, eraserOverride: Boolean = false): Brush? {
