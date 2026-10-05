@@ -83,7 +83,7 @@ object Brushes {
             targetModifierRangeEnd = 1.15f,
         )
         val tip = BrushTip(
-            scaleX = 0.4f,
+            scaleX = 0.22f,
             scaleY = 1f,
             cornerRounding = 0.15f,
             rotationDegrees = 45f,
