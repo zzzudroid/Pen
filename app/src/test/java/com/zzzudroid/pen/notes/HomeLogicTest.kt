@@ -17,17 +17,29 @@ class HomeLogicTest {
         NotebookEntry(File(name), meta(kind, modified))
 
     @Test
-    fun `колонки по ширине половины`() {
-        assertEquals(3, HomeLogic.columns(557f)) // Pad 7, альбомная
-        assertEquals(2, HomeLogic.columns(364f)) // Pad 7, портретная
-        assertEquals(1, HomeLogic.columns(100f)) // минимум одна
-        assertEquals(4, HomeLogic.columns(5000f)) // максимум четыре
+    fun `портрет — две колонки и целые ряды`() {
+        val l = HomeLogic.layout(340f, 1000f) // половина Pad 7 в портретной ориентации
+        assertEquals(2, l.columns)
+        assertTrue(l.rows >= 2)
+        assertEquals(2 * l.rows, l.cells)
+        assertTrue(l.heightDp <= 1000f) // ряды целиком, ничего не режется
+        // ещё один ряд уже не влез бы
+        assertTrue(l.heightDp + HomeLogic.GAP_DP + l.cardHeightDp > 1000f || l.rows == 4)
     }
 
     @Test
-    fun `ячеек вдвое больше колонок`() {
-        assertEquals(6, HomeLogic.cells(3))
-        assertEquals(2, HomeLogic.cells(1))
+    fun `альбом — карточки сжимаются, чтобы поместились два ряда`() {
+        val l = HomeLogic.layout(557f, 580f, columns = 3)
+        assertEquals(3, l.columns)
+        assertEquals(2, l.rows)
+        assertTrue(l.heightDp <= 580f)
+        assertTrue(l.cardWidthDp >= HomeLogic.MIN_CARD_DP)
+    }
+
+    @Test
+    fun `совсем мало места — один ряд`() {
+        val l = HomeLogic.layout(557f, 300f, columns = 3)
+        assertEquals(1, l.rows)
     }
 
     @Test

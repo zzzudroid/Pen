@@ -3,6 +3,8 @@ package com.zzzudroid.pen.ui
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +24,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.zzzudroid.pen.notes.Formatting
 import com.zzzudroid.pen.notes.NotebookEntry
 import com.zzzudroid.pen.notes.NotebookFormat
@@ -74,6 +76,20 @@ fun NotebookCard(
                 Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
             }
             if (entry.meta == null) Text("Файл повреждён", color = MaterialTheme.colorScheme.error)
+            // Меню действий — кружок в левом верхнем углу миниатюры, чтобы подпись занимала всю ширину карточки
+            Box(Modifier.align(Alignment.TopStart).padding(6.dp)) {
+                Box(
+                    Modifier.size(32.dp).background(Color(0xB3000000), CircleShape).clickable { menu = true },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.MoreVert, contentDescription = "Действия", modifier = Modifier.size(20.dp), tint = Color.White) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    if (entry.meta != null) {
+                        DropdownMenuItem(text = { Text("Поделиться PDF") }, onClick = { menu = false; onSharePdf() })
+                        DropdownMenuItem(text = { Text("Переименовать") }, onClick = { menu = false; onRename() })
+                    }
+                    DropdownMenuItem(text = { Text("Удалить") }, onClick = { menu = false; onDelete() })
+                }
+            }
             // Размер файла сверху на миниатюре; тёмная полупрозрачная подложка читается и на светлой странице, и на тёмной доске
             Text(
                 fileSize,
@@ -86,7 +102,7 @@ fun NotebookCard(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Значок типа одного размера и на одном месте у тетради и у доски; тип словами не пишем
@@ -97,33 +113,18 @@ fun NotebookCard(
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(3.dp))
                     }
-                    Text(entry.meta?.title ?: entry.id, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                    Text(entry.meta?.title ?: entry.id, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp))
                 }
                 Text(
-                    entry.meta?.let {
-                        // Дата — первой строкой и целиком; у тетради число страниц — второй (в одну строку не помещается)
-                        val date = Formatting.formatDate(it.modified)
-                        if (it.isBoard) date else "$date\n${it.pageIds.size} стр."
-                    } ?: (entry.error ?: ""),
+                    // Только дата; число страниц не показываем
+                    entry.meta?.let { Formatting.formatDate(it.modified) } ?: (entry.error ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    // Две строки у всех карточек — одинаковая высота и ровные ряды
-                    minLines = 2,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Действия") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (entry.meta != null) {
-                        DropdownMenuItem(text = { Text("Поделиться PDF") }, onClick = { menu = false; onSharePdf() })
-                        DropdownMenuItem(text = { Text("Переименовать") }, onClick = { menu = false; onRename() })
-                    }
-                    DropdownMenuItem(text = { Text("Удалить") }, onClick = { menu = false; onDelete() })
-                }
             }
         }
     }

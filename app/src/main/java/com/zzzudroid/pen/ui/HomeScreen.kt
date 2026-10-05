@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -129,7 +133,6 @@ fun HomeScreen(
                         kind = DocKind.NOTEBOOK,
                         entries = entries,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        headerAction = null,
                         onOpenList = onOpenList,
                         onCreate = { docs.createNow(false, onOpenDocument) },
                         onOpen = onOpenDocument,
@@ -142,7 +145,6 @@ fun HomeScreen(
                         kind = DocKind.BOARD,
                         entries = entries,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        headerAction = null,
                         onOpenList = onOpenList,
                         onCreate = { docs.createNow(true, onOpenDocument) },
                         onOpen = onOpenDocument,
@@ -159,14 +161,16 @@ fun HomeScreen(
     DocumentDialogs(docs)
 }
 
-/** Одна половина экрана: заголовок-ссылка на полный список и сетка из плитки «создать» и последних документов. */
+/**
+ * Одна половина экрана со своим фоном: заголовок по центру (тап открывает полный список) и сетка из плитки «создать»
+ * и последних документов — две колонки и целое число рядов, карточки не режутся.
+ */
 @Composable
 private fun Half(
     title: String,
     kind: DocKind,
     entries: List<NotebookEntry>?,
     modifier: Modifier,
-    headerAction: (@Composable () -> Unit)?,
     onOpenList: (DocKind) -> Unit,
     onCreate: () -> Unit,
     onOpen: (String) -> Unit,
@@ -174,30 +178,32 @@ private fun Half(
     onRename: (NotebookEntry) -> Unit,
     onDelete: (NotebookEntry) -> Unit,
 ) {
-    Column(modifier) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Row(
-                Modifier.clickable { onOpenList(kind) }.padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(title, style = MaterialTheme.typography.titleLarge)
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Все: $title")
-            }
-            Box(Modifier.weight(1f))
-            headerAction?.invoke()
-        }
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            // Колонок столько, сколько помещается; ячеек два ряда, первая — плитка «создать»
-            val columns = HomeLogic.columns(maxWidth.value)
-            val recent = if (entries == null) emptyList() else HomeLogic.recent(entries, kind, HomeLogic.cells(columns) - 1)
+    // Заметки и холсты — разные оттенки фона, чтобы половины отличались с первого взгляда
+    val tint = if (kind == DocKind.BOARD) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.28f)
+    else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+    Column(
+        modifier.clip(RoundedCornerShape(20.dp)).background(tint).padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.clickable { onOpenList(kind) }.padding(vertical = 12.dp, horizontal = 16.dp),
+        )
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
+            val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+            val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val layout = HomeLogic.layout(maxWidth.value, maxHeight.value, HomeLogic.captionDp(fontScale), HomeLogic.columnsFor(landscape))
+            val recent = if (entries == null) emptyList() else HomeLogic.recent(entries, kind, layout.cells - 1)
+            val cardHeight = layout.cardHeightDp.dp
             LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
-                modifier = Modifier.fillMaxSize(),
+                columns = GridCells.Fixed(layout.columns),
+                modifier = Modifier.width(layout.widthDp.dp).height(layout.heightDp.dp),
                 userScrollEnabled = false,
                 horizontalArrangement = Arrangement.spacedBy(HomeLogic.GAP_DP.dp),
                 verticalArrangement = Arrangement.spacedBy(HomeLogic.GAP_DP.dp),
             ) {
-                item(key = "create") { CreateTile(isBoard = kind == DocKind.BOARD, onClick = onCreate) }
+                item(key = "create") { CreateTile(isBoard = kind == DocKind.BOARD, onClick = onCreate, height = cardHeight) }
                 items(recent, key = { it.id }) { e ->
                     NotebookCard(
                         entry = e,
@@ -205,6 +211,7 @@ private fun Half(
                         onSharePdf = { onShare(e) },
                         onRename = { onRename(e) },
                         onDelete = { onDelete(e) },
+                        modifier = Modifier.height(cardHeight),
                     )
                 }
             }
@@ -217,12 +224,13 @@ private fun Half(
  * Нажатие создаёт документ и открывает его сразу, без диалога.
  */
 @Composable
-fun CreateTile(isBoard: Boolean, onClick: () -> Unit) {
+fun CreateTile(isBoard: Boolean, onClick: () -> Unit, height: androidx.compose.ui.unit.Dp? = null) {
+    // Высота не задана (список) — как у карточки такой же ширины
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val height = maxWidth * (297f / 210f) + 93.dp
+        val h = height ?: HomeLogic.cardHeightFor(maxWidth.value).dp
         OutlinedCard(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth().height(height),
+            modifier = Modifier.fillMaxWidth().height(h),
             border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

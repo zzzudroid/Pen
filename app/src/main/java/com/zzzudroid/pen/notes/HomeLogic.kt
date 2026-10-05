@@ -2,16 +2,46 @@ package com.zzzudroid.pen.notes
 
 /** Чистая логика главного экрана: сколько показывать «последних» и какие именно (покрыта JVM-тестами). */
 object HomeLogic {
-    /** Ширина карточки в сетке главного экрана и зазор между карточками, dp. */
-    const val CARD_DP = 150f
+    /** Зазор между карточками и высота подписи под миниатюрой (значок, дата, страницы), dp. */
     const val GAP_DP = 12f
+    const val CAPTION_DP = 56f
 
-    /** Колонок в половине экрана шириной [halfWidthDp]: сколько карточек помещается по ширине, от 1 до 4. */
-    fun columns(halfWidthDp: Float): Int =
-        ((halfWidthDp + GAP_DP) / (CARD_DP + GAP_DP)).toInt().coerceIn(1, 4)
+    /** Высота подписи при масштабе шрифта [fontScale]: заголовок и строка даты растут вместе со шрифтом. */
+    fun captionDp(fontScale: Float): Float = 16f + 40f * fontScale.coerceAtLeast(1f)
 
-    /** Всего ячеек в половине (включая плитку «создать»): два ряда. */
-    fun cells(columns: Int): Int = columns * 2
+    /** Самая узкая карточка, при которой подпись ещё читается целиком, dp. */
+    const val MIN_CARD_DP = 130f
+
+    /** Колонок в половине: три в альбомной ориентации, две в портретной. */
+    fun columnsFor(landscape: Boolean): Int = if (landscape) 3 else 2
+
+    /** Размер карточек половины: заданное число колонок и целое число рядов (карточки не режутся). */
+    data class GridLayout(val cardWidthDp: Float, val rows: Int, val columns: Int, val captionDp: Float = CAPTION_DP) {
+        val cardHeightDp get() = cardHeightFor(cardWidthDp, captionDp)
+        val cells get() = columns * rows
+        val widthDp get() = columns * cardWidthDp + (columns - 1) * GAP_DP
+        val heightDp get() = rows * cardHeightDp + (rows - 1) * GAP_DP
+    }
+
+    private const val MAX_ROWS = 4
+
+    /** Высота карточки шириной [cardWidthDp]: миниатюра формата A4 и подпись. */
+    fun cardHeightFor(cardWidthDp: Float, captionDp: Float = CAPTION_DP): Float = cardWidthDp * (297f / 210f) + captionDp
+
+    /**
+     * Раскладка в области [widthDp] × [heightDp]: [columns] колонок на всю ширину и столько рядов, сколько целиком влезает.
+     * Если по высоте не влезает и двух рядов (альбомная ориентация), карточки уменьшаются, чтобы поместились два ряда;
+     * если и так слишком мелко — один ряд.
+     */
+    fun layout(widthDp: Float, heightDp: Float, captionDp: Float = CAPTION_DP, columns: Int = 2): GridLayout {
+        val full = ((widthDp - (columns - 1) * GAP_DP) / columns).coerceAtLeast(MIN_CARD_DP)
+        val rowsFit = ((heightDp + GAP_DP) / (cardHeightFor(full, captionDp) + GAP_DP)).toInt()
+        if (rowsFit >= 2) return GridLayout(full, rowsFit.coerceAtMost(MAX_ROWS), columns, captionDp)
+        val two = ((heightDp - GAP_DP) / 2 - captionDp) * (210f / 297f)
+        if (two >= MIN_CARD_DP) return GridLayout(minOf(two, full), 2, columns, captionDp)
+        val one = ((heightDp - captionDp) * (210f / 297f)).coerceIn(MIN_CARD_DP, full)
+        return GridLayout(one, 1, columns, captionDp)
+    }
 
     /**
      * Последние документы вида [kind]: по убыванию времени изменения, не больше [limit].
