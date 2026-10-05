@@ -100,7 +100,13 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                 )
                 out.add(p)
             }
-            return Stroke(stroke.brush, out)
+            val result = Stroke(stroke.brush, out)
+            // Сглаженный штрих без видимой геометрии (пустая сетка) не подставляем — оставляем исходный, чтобы буква не пропала
+            if (result.shape.computeBoundingBox() == null) {
+                android.util.Log.w("PenDraw", "Сглаженный штрих пуст, оставляем исходный")
+                return stroke
+            }
+            return result
         } catch (e: Exception) {
             android.util.Log.w("PenDraw", "Сглаживание штриха не удалось, оставляем как есть", e)
             return stroke
@@ -119,7 +125,12 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         private val fx = OneEuro(minCutoff = when (level) { 0 -> 1000f; 1 -> 4f; 2 -> 2f; else -> 1f }, beta = when (level) { 0 -> 0f; 1 -> 0.02f; 2 -> 0.01f; else -> 0.006f })
         private val fy = OneEuro(minCutoff = fx.minCutoff, beta = fx.beta)
 
-        private fun input(ev: MotionEvent, i: Int, t: Long, x: Float, y: Float, h: Int, speedWidth: Boolean = false): StrokeInput {
+        // Ink требует неубывающее время точек: событиями пера время иногда «скачет» назад — выравниваем
+        private var emittedT = 0L
+
+        private fun input(ev: MotionEvent, i: Int, rawT: Long, x: Float, y: Float, h: Int, speedWidth: Boolean = false): StrokeInput {
+            val t = if (rawT < emittedT) emittedT else rawT
+            emittedT = t
             var pressure = if (h < 0) ev.getPressure(i) else ev.getHistoricalPressure(i, h)
             // «Давление» выключено — постоянное; включено — реальный нажим со скоростью (при красивом пере)
             pressure = if (!pressureOn) 0.7f else if (speedWidth) live(pressure, x, y, t) else pressure
@@ -169,6 +180,10 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), -1, speedWidth = true))
             return out
         }
+
+        /** Последняя принятая Ink точка (запасной конец штриха). */
+        fun lastAccepted(): StrokeInput =
+            StrokeInput.create(lastX, lastY, emittedT, InputToolType.STYLUS, WORLD_UNIT_CM, 0.5f, InkInputRanges.tilt(0f), 0f)
 
         /** Последняя точка — настоящая, без сглаживания: штрих заканчивается там, где отпустили перо. */
         fun last(ev: MotionEvent, i: Int): StrokeInput {
@@ -432,7 +447,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             // Отпускание с FLAG_CANCELED — система решила, что касание случайное
             if (ev.flags and MotionEvent.FLAG_CANCELED != 0) inProgress.cancelStroke(strokeId, ev)
             else {
-                if (sm != null) inProgress.finishStroke(sm.last(ev, ev.findPointerIndex(id).coerceAtLeast(0)), strokeId)
+                if (sm != null) finishSmoothed(sm, ev, id, strokeId)
                 else inProgress.finishStroke(ev, id, strokeId)
                 // Не ждать паузы-«отстоя»: сразу передать готовый штрих в слой штрихов
                 inProgress.requestHandoff()
@@ -447,6 +462,24 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         }
 
         if (fingers.remove(id) != null && fingers.isEmpty()) onGestureEnd(ev.eventTime)
+    }
+
+    /**
+     * Завершить штрих сглаженного пути. Если Ink отвергает последнюю точку, штрих всё равно нужно закрыть, иначе он остаётся
+     * «незавершённым»: висит на экране, не попадает в файл и пропадает при следующем письме.
+     */
+    private fun finishSmoothed(sm: SmoothedStroke, ev: MotionEvent, id: Int, strokeId: InProgressStrokeId) {
+        try {
+            inProgress.finishStroke(sm.last(ev, ev.findPointerIndex(id).coerceAtLeast(0)), strokeId)
+        } catch (e: IllegalArgumentException) {
+            android.util.Log.w("PenDraw", "Конец штриха отвергнут Ink, закрываем по последней принятой точке", e)
+            try {
+                inProgress.finishStroke(sm.lastAccepted(), strokeId)
+            } catch (e2: Exception) {
+                android.util.Log.e("PenDraw", "Штрих закрыть не удалось, отменяем", e2)
+                inProgress.cancelStroke(strokeId, ev)
+            }
+        }
     }
 
     private fun resetAll() {

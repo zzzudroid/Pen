@@ -184,18 +184,31 @@ object NotebookFormat {
         true
     }
 
+    /**
+     * Читает штрихи страницы. Штрих с нечитаемыми данными пропускается (с записью в журнал), а не валит всю тетрадь:
+     * длина каждого штриха записана в файле, поэтому следующий читается правильно.
+     */
     private fun readStrokes(bytes: ByteArray): List<Stroke> = DataInputStream(ByteArrayInputStream(bytes)).use { d ->
         val count = d.readInt()
-        List(count) {
-            val tool = CanvasTool.entries.firstOrNull { it.id == d.readUTF() } ?: CanvasTool.PEN
+        val result = ArrayList<Stroke>(count)
+        for (index in 0 until count) {
+            // Идентификатор читаем один раз: прежде readUTF() стоял внутри перебора инструментов и читал строк больше нужного,
+            // из-за чего штрихи не первого по списку инструмента (каллиграфия, маркер) ломали чтение всей страницы
+            val toolId = d.readUTF()
+            val tool = CanvasTool.entries.firstOrNull { it.id == toolId } ?: CanvasTool.PEN
             val color = d.readInt()
             val size = d.readFloat()
             val epsilon = d.readFloat()
             val data = ByteArray(d.readInt()).also { d.readFully(it) }
-            val inputs = StrokeInputBatch.decode(ByteArrayInputStream(data))
-            val family = Brushes.family(tool) ?: Brushes.pen
-            Stroke(Brush.createWithColorIntArgb(family, color, size, epsilon), inputs)
+            try {
+                val inputs = StrokeInputBatch.decode(ByteArrayInputStream(data))
+                val family = Brushes.family(tool) ?: Brushes.pen
+                result += Stroke(Brush.createWithColorIntArgb(family, color, size, epsilon), inputs)
+            } catch (e: Exception) {
+                android.util.Log.w("PenNotes", "Штрих №$index ($tool, ${data.size} байт) не прочитан, пропущен", e)
+            }
         }
+        result
     }
 
     fun readThumbnail(file: File): Bitmap? = try {
