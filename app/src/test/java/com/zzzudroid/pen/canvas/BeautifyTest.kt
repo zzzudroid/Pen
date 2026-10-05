@@ -85,4 +85,29 @@ class BeautifyTest {
         for (i in 1 until p.source.size) assertTrue(p.source[i] >= p.source[i - 1])
         assertNotNull(p)
     }
+
+    @Test
+    fun `быстрые участки тоньше медленных`() {
+        // Первые 60 точек — медленно (20 мм/с), следующие 60 — быстро (500 мм/с); шаг по времени 10 мс
+        val n = 120
+        val xs = FloatArray(n)
+        val ys = FloatArray(n)
+        val t = FloatArray(n) { it * 10f }
+        var x = 0f
+        for (i in 1 until n) {
+            x += if (i < 60) 1f else 25f // 1 ед. за 10 мс = 20 мм/с; 25 ед. за 10 мс = 500 мм/с
+            xs[i] = x
+        }
+        val w = Beautify.widthFactors(xs, ys, t)
+        assertTrue("медленно: ${w[20]}", w[20] > 0.95f)
+        assertTrue("быстро: ${w[100]}", w[100] < 0.45f)
+        assertTrue(w.all { it in 0.39f..1.001f })
+    }
+
+    @Test
+    fun `без времени толщина не меняется`() {
+        val xs = FloatArray(30) { it * 2f }
+        val w = Beautify.widthFactors(xs, FloatArray(30), FloatArray(30)) // время везде 0
+        assertTrue(w.all { it == 1f })
+    }
 }

@@ -69,6 +69,18 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             val b = StrokeInput()
             val out = MutableStrokeInputBatch()
             val p = StrokeInput()
+            // Время каждой новой точки — заранее: по нему считается «перьевая» толщина
+            val m = path.xs.size
+            val times = FloatArray(m)
+            for (k in 0 until m) {
+                val f = path.source[k].coerceIn(0f, (n - 1).toFloat())
+                val i0 = f.toInt().coerceAtMost(n - 1)
+                val i1 = (i0 + 1).coerceAtMost(n - 1)
+                inputs.populate(i0, a)
+                inputs.populate(i1, b)
+                times[k] = a.elapsedTimeMillis + (b.elapsedTimeMillis - a.elapsedTimeMillis) * (f - i0)
+            }
+            val width = Beautify.widthFactors(path.xs, path.ys, times)
             for (k in path.xs.indices) {
                 val f = path.source[k].coerceIn(0f, (n - 1).toFloat())
                 val i0 = f.toInt().coerceAtMost(n - 1)
@@ -81,7 +93,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
                     path.xs[k], path.ys[k],
                     (a.elapsedTimeMillis + (b.elapsedTimeMillis - a.elapsedTimeMillis) * t).toLong(),
                     a.toolType, a.strokeUnitLengthCm,
-                    mix(a.pressure, b.pressure), mix(a.tiltRadians, b.tiltRadians),
+                    // Реальное нажим (если есть) смешивается с толщиной по скорости: перо рисует как чернильное
+                    mix(a.pressure, b.pressure).let { real -> if (real < 0f) width[k] * 0.9f else (0.5f * real + 0.5f * width[k]).coerceIn(0f, 1f) },
+                    mix(a.tiltRadians, b.tiltRadians),
                     if (t < 0.5f) a.orientationRadians else b.orientationRadians,
                 )
                 out.add(p)
