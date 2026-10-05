@@ -99,9 +99,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text("Сила сглаживания", style = MaterialTheme.typography.bodyLarge)
+                Text("Красивое перо: сила сглаживания", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "Включается кнопкой на панели инструментов. Чем сильнее, тем заметнее отставание линии от кончика",
+                    "Кнопка «красивое перо» на панели: сглаживание, плоское каллиграфическое перо и толщина по скорости. Чем сильнее сглаживание, тем заметнее отставание линии от кончика",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

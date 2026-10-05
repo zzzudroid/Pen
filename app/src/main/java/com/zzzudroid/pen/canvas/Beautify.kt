@@ -78,7 +78,7 @@ object Beautify {
     }
 
     /**
-     * «Перьевая» толщина: коэффициент 0,4…1 для каждой точки по скорости письма — медленные участки толще, быстрые тоньше,
+     * «Перьевая» толщина: коэффициент 0,33…1 для каждой точки по скорости письма — медленные участки толще, быстрые тоньше,
      * как у чернильной ручки. Скорость берётся по окну в ±[WINDOW] точек, чтобы шум времени не давал рывков толщины.
      * [tMs] — время каждой точки (мс). Если время не растёт (нет данных) — везде 1.
      */
@@ -93,16 +93,24 @@ object Beautify {
             val b = (i + WINDOW).coerceAtMost(n - 1)
             val dt = tMs[b] - tMs[a]
             if (dt <= 0f) continue
-            val mmPerSec = (s[b] - s[a]) / 5f / dt * 1000f // 5 ед. мира = 1 мм
-            val t = ((mmPerSec - SLOW_MM_S) / (FAST_MM_S - SLOW_MM_S)).coerceIn(0f, 1f)
-            w[i] = 1f - 0.6f * t * t * (3 - 2 * t) // плавный переход 1 → 0,4
+            w[i] = widthForSpeed((s[b] - s[a]) / 5f / dt * 1000f) // 5 ед. мира = 1 мм
         }
         return w
     }
 
+    /**
+     * Коэффициент толщины 0,33…1 по скорости письма, мм/с. Кривая снята с INKredible (тот же планшет, имитация пера):
+     * ~100 мм/с и медленнее — полная толщина, ~190 — около 0,75, ~410 — около 0,33.
+     */
+    fun widthForSpeed(mmPerSec: Float): Float {
+        val t = ((mmPerSec - SLOW_MM_S) / (FAST_MM_S - SLOW_MM_S)).coerceIn(0f, 1f)
+        return 1f - (1f - MIN_WIDTH) * t * t * (3 - 2 * t)
+    }
+
     private const val WINDOW = 4
-    private const val SLOW_MM_S = 40f
-    private const val FAST_MM_S = 350f
+    private const val SLOW_MM_S = 90f
+    private const val FAST_MM_S = 420f
+    private const val MIN_WIDTH = 0.33f
 
     /** Длина дуги ломаной — для тестов и оценки. */
     fun length(xs: FloatArray, ys: FloatArray): Float {

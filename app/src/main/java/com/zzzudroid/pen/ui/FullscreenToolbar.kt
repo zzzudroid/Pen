@@ -72,7 +72,7 @@ fun FullscreenToolbar(vm: CanvasViewModel, onExit: () -> Unit, modifier: Modifie
                 IconButton(onClick = { expanded = false }, modifier = Modifier.size(ButtonSize)) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Свернуть панель")
                 }
-                CanvasTool.entries.forEach { t ->
+                CanvasTool.entries.filter { it != CanvasTool.CALLIGRAPHY }.forEach { t ->
                     FilledIconToggleButton(
                         checked = vm.tool == t,
                         onCheckedChange = {
@@ -93,7 +93,7 @@ fun FullscreenToolbar(vm: CanvasViewModel, onExit: () -> Unit, modifier: Modifie
                     onCheckedChange = { com.zzzudroid.pen.settings.AppSettings.putSmoothingOn(it) },
                     modifier = Modifier.size(ButtonSize),
                 ) {
-                    Icon(Icons.Outlined.AutoFixHigh, contentDescription = "Сглаживание пера", modifier = Modifier.size(24.dp))
+                    Icon(Icons.Outlined.AutoFixHigh, contentDescription = "Красивое перо: сглаживание и каллиграфия", modifier = Modifier.size(24.dp))
                 }
                 FilledIconToggleButton(
                     checked = vm.eraseWithFinger,

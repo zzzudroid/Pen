@@ -108,7 +108,7 @@ fun CanvasToolbar(vm: CanvasViewModel) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        CanvasTool.entries.forEach { t ->
+        CanvasTool.entries.filter { it != CanvasTool.CALLIGRAPHY }.forEach { t ->
             FilledIconToggleButton(
                 checked = vm.tool == t,
                 onCheckedChange = {
@@ -168,7 +168,7 @@ fun CanvasToolbar(vm: CanvasViewModel) {
             onCheckedChange = { com.zzzudroid.pen.settings.AppSettings.putSmoothingOn(it) },
             modifier = Modifier.size(ToolButtonSize),
         ) {
-            Icon(Icons.Outlined.AutoFixHigh, contentDescription = "Сглаживание пера", modifier = Modifier.size(26.dp))
+            Icon(Icons.Outlined.AutoFixHigh, contentDescription = "Красивое перо: сглаживание и каллиграфия", modifier = Modifier.size(26.dp))
         }
         // «Стирать пальцем»: включено — палец стирает как ластик; выключено — палец листает, перо рисует
         FilledIconToggleButton(

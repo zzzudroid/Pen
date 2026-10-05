@@ -119,8 +119,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         private val fx = OneEuro(minCutoff = when (level) { 1 -> 4f; 2 -> 2f; else -> 1f }, beta = when (level) { 1 -> 0.02f; 2 -> 0.01f; else -> 0.006f })
         private val fy = OneEuro(minCutoff = fx.minCutoff, beta = fx.beta)
 
-        private fun input(ev: MotionEvent, i: Int, t: Long, x: Float, y: Float, h: Int): StrokeInput {
-            val pressure = if (h < 0) ev.getPressure(i) else ev.getHistoricalPressure(i, h)
+        private fun input(ev: MotionEvent, i: Int, t: Long, x: Float, y: Float, h: Int, speedWidth: Boolean = false): StrokeInput {
+            var pressure = if (h < 0) ev.getPressure(i) else ev.getHistoricalPressure(i, h)
+            if (speedWidth) pressure = live(pressure, x, y, t)
             val orientation = if (h < 0) ev.getOrientation(i) else ev.getHistoricalOrientation(i, h)
             val tilt = if (h < 0) ev.getAxisValue(MotionEvent.AXIS_TILT, i) else ev.getHistoricalAxisValue(MotionEvent.AXIS_TILT, i, h)
             // Ink строг к диапазонам: азимут Android −π…π, Ink ждёт 0…2π
@@ -130,8 +131,27 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             )
         }
 
+        // Скорость письма (сглаженная) для живой «перьевой» толщины и предыдущая точка
+        private var lastX = 0f
+        private var lastY = 0f
+        private var lastT = 0L
+        private var speedUnitsPerMs = 0f
+
+        /** Давление точки: реальное, смешанное с толщиной по скорости письма (медленно — толще, быстро — тоньше). */
+        private fun live(real: Float, x: Float, y: Float, t: Long): Float {
+            val dt = t - lastT
+            if (dt > 0) {
+                val v = hypot(x - lastX, y - lastY) / dt
+                speedUnitsPerMs += 0.25f * (v - speedUnitsPerMs)
+                lastX = x; lastY = y; lastT = t
+            }
+            val w = Beautify.widthForSpeed(speedUnitsPerMs * 1000f / 5f) // ед./мс → мм/с
+            return if (real < 0f) w * 0.9f else (0.5f * real + 0.5f * w).coerceIn(0f, 1f)
+        }
+
         fun first(ev: MotionEvent, i: Int, w: FloatArray): StrokeInput {
             fx.reset(w[0], 0L); fy.reset(w[1], 0L)
+            lastX = w[0]; lastY = w[1]; lastT = 0L; speedUnitsPerMs = 0f
             return input(ev, i, 0L, w[0], w[1], -1)
         }
 
@@ -141,11 +161,11 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             for (h in 0 until ev.historySize) {
                 val t = ev.getHistoricalEventTime(h) - downTime
                 val w = worldPoint(ev.getHistoricalX(i, h), ev.getHistoricalY(i, h))
-                out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), h))
+                out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), h, speedWidth = true))
             }
             val t = ev.eventTime - downTime
             val w = worldPoint(ev.getX(i), ev.getY(i))
-            out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), -1))
+            out.add(input(ev, i, t, fx.filter(w[0], t), fy.filter(w[1], t), -1, speedWidth = true))
             return out
         }
 

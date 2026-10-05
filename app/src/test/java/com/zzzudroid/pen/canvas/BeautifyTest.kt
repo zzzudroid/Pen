@@ -100,8 +100,8 @@ class BeautifyTest {
         }
         val w = Beautify.widthFactors(xs, ys, t)
         assertTrue("медленно: ${w[20]}", w[20] > 0.95f)
-        assertTrue("быстро: ${w[100]}", w[100] < 0.45f)
-        assertTrue(w.all { it in 0.39f..1.001f })
+        assertTrue("быстро: ${w[100]}", w[100] < 0.4f)
+        assertTrue(w.all { it in 0.32f..1.001f })
     }
 
     @Test
@@ -109,5 +109,14 @@ class BeautifyTest {
         val xs = FloatArray(30) { it * 2f }
         val w = Beautify.widthFactors(xs, FloatArray(30), FloatArray(30)) // время везде 0
         assertTrue(w.all { it == 1f })
+    }
+
+    @Test
+    fun `кривая толщины по скорости совпадает с замером INKredible`() {
+        assertEquals(1f, Beautify.widthForSpeed(0f), 1e-4f)
+        assertEquals(1f, Beautify.widthForSpeed(90f), 1e-4f)
+        assertEquals(0.75f, Beautify.widthForSpeed(190f), 0.12f) // ~9 px из 12
+        assertEquals(0.33f, Beautify.widthForSpeed(410f), 0.05f) // ~4 px из 12
+        assertEquals(0.33f, Beautify.widthForSpeed(3000f), 1e-4f)
     }
 }

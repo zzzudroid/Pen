@@ -78,14 +78,15 @@ object Brushes {
             target = BrushBehavior.Target.SIZE_MULTIPLIER,
             sourceValueRangeStart = 0f,
             sourceValueRangeEnd = 1f,
-            targetModifierRangeStart = 0.75f,
-            targetModifierRangeEnd = 1.2f,
+            // Нажим (и скорость письма, см. DrawingSurface) меняют толщину в 3 раза: как у INKredible
+            targetModifierRangeStart = 0.35f,
+            targetModifierRangeEnd = 1.15f,
         )
         val tip = BrushTip(
-            scaleX = 0.28f,
+            scaleX = 0.4f,
             scaleY = 1f,
             cornerRounding = 0.15f,
-            rotationDegrees = 40f,
+            rotationDegrees = 45f,
             behaviors = listOf(pressure),
         )
         BrushFamily(coats = listOf(BrushCoat(tip)), clientBrushFamilyId = "calligraphy")
@@ -447,15 +448,17 @@ open class CanvasViewModel : ViewModel() {
     /** Кисть для нового штриха. Размеры заданы в dp при масштабе 100%. */
     fun brush(density: Float, eraserOverride: Boolean = false): Brush? {
         if (eraserOverride) return null
-        val family = Brushes.family(tool) ?: return null
+        // Кнопка «красивое перо» превращает ручку в каллиграфическое перо (штрихи сохраняются как «calligraphy»)
+        val effective = if (tool == CanvasTool.PEN && com.zzzudroid.pen.settings.AppSettings.smoothingOn) CanvasTool.CALLIGRAPHY else tool
+        val family = Brushes.family(effective) ?: return null
         val base = PALETTE[colorIndex]
-        val sizes = when (tool) {
+        val sizes = when (effective) {
             CanvasTool.MARKER -> MARKER_SIZES
             CanvasTool.HIGHLIGHTER -> HIGHLIGHTER_SIZES
             CanvasTool.CALLIGRAPHY -> CALLIGRAPHY_SIZES
             else -> PEN_SIZES
         }
-        val color = if (tool == CanvasTool.HIGHLIGHTER) highlighterColor(base) else base
+        val color = if (effective == CanvasTool.HIGHLIGHTER) highlighterColor(base) else base
         // Размер хранится в единицах холста: делим на масштаб вида, чтобы на экране линия была заданной толщины
         // при любом увеличении (лист вписан по ширине — масштаб около 3)
         return Brush.createWithColorIntArgb(family, color, sizes[sizeIndex] * density / viewport.scale, BRUSH_EPSILON)
@@ -482,7 +485,7 @@ open class CanvasViewModel : ViewModel() {
     companion object {
         val PEN_SIZES = listOf(1.2f, 2.5f, 5f)
         val MARKER_SIZES = listOf(3f, 6f, 12f)
-        val CALLIGRAPHY_SIZES = listOf(4f, 7f, 12f)
+        val CALLIGRAPHY_SIZES = listOf(2.5f, 4f, 7f)
         val HIGHLIGHTER_SIZES = listOf(10f, 18f, 28f)
         const val BRUSH_EPSILON = 0.1f
         const val PAGE_MARGIN_DP = 16f
