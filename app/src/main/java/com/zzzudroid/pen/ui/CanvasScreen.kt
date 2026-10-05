@@ -19,6 +19,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconToggleButton
@@ -164,6 +166,13 @@ fun CanvasToolbar(vm: CanvasViewModel) {
             modifier = Modifier.size(ToolButtonSize),
         ) {
             Icon(Icons.Outlined.TouchApp, contentDescription = "Стирать пальцем", modifier = Modifier.size(26.dp))
+        }
+        FilledIconToggleButton(
+            checked = vm.viewLocked,
+            onCheckedChange = { vm.viewLocked = it },
+            modifier = Modifier.size(ToolButtonSize),
+        ) {
+            Icon(if (vm.viewLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen, contentDescription = "Заблокировать перемещение поля", modifier = Modifier.size(26.dp))
         }
     }
 }

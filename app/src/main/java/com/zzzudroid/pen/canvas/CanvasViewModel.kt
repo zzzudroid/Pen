@@ -27,8 +27,21 @@ sealed interface CanvasCommand {
     class Add(val stroke: Stroke) : CanvasCommand
     class Erase(val strokes: List<Stroke>) : CanvasCommand
 
-    /** Замена штрихов: перемещение, масштаб, перекраска выделения. */
-    class Replace(val removed: List<Stroke>, val added: List<Stroke>) : CanvasCommand
+    /**
+     * Замена штрихов: перемещение, масштаб, перекраска выделения. [linksOld] → [linksNew] — ссылки, которые поехали
+     * вместе со штрихами (целиком внутри выделения); пары по порядку.
+     */
+    class Replace(
+        val removed: List<Stroke>,
+        val added: List<Stroke>,
+        val linksOld: List<DocLink> = emptyList(),
+        val linksNew: List<DocLink> = emptyList(),
+    ) : CanvasCommand
+
+    /** Ссылки: создание, удаление и смена цели/области — как команды истории, чтобы «Отменить» работало. */
+    class LinkAdded(val link: DocLink) : CanvasCommand
+    class LinkRemoved(val links: List<DocLink>) : CanvasCommand
+    class LinkChanged(val old: List<DocLink>, val new: List<DocLink>) : CanvasCommand
 
     /** Добавление нескольких штрихов разом (копия выделения). */
     class AddMany(val strokes: List<Stroke>) : CanvasCommand
@@ -95,6 +108,8 @@ open class CanvasViewModel : ViewModel() {
     var sizeIndex by mutableIntStateOf(1)
     /** Стирать пальцем: палец работает как штриховой ластик (перо при этом рисует по-прежнему). */
     var eraseWithFinger by mutableStateOf(false)
+    /** Вид заблокирован: пальцы не двигают и не масштабируют поле — только пишем пером. */
+    var viewLocked by mutableStateOf(false)
 
     /** Страница показана целиком (иначе — вписана по ширине). */
     var fitWhole by mutableStateOf(false); private set
@@ -130,8 +145,11 @@ open class CanvasViewModel : ViewModel() {
         when (c) {
             is CanvasCommand.Add -> removeAll(listOf(c.stroke))
             is CanvasCommand.Erase -> strokes += c.strokes
-            is CanvasCommand.Replace -> { removeAll(c.added); strokes += c.removed }
+            is CanvasCommand.Replace -> { removeAll(c.added); strokes += c.removed; swapLinks(c.linksNew, c.linksOld) }
             is CanvasCommand.AddMany -> removeAll(c.strokes)
+            is CanvasCommand.LinkAdded -> page.links.removeAll { it.id == c.link.id }
+            is CanvasCommand.LinkRemoved -> page.links += c.links
+            is CanvasCommand.LinkChanged -> swapLinks(c.new, c.old)
         }
         changed(content = true)
     }
@@ -142,8 +160,11 @@ open class CanvasViewModel : ViewModel() {
         when (c) {
             is CanvasCommand.Add -> strokes += c.stroke
             is CanvasCommand.Erase -> removeAll(c.strokes)
-            is CanvasCommand.Replace -> { removeAll(c.removed); strokes += c.added }
+            is CanvasCommand.Replace -> { removeAll(c.removed); strokes += c.added; swapLinks(c.linksOld, c.linksNew) }
             is CanvasCommand.AddMany -> strokes += c.strokes
+            is CanvasCommand.LinkAdded -> page.links += c.link
+            is CanvasCommand.LinkRemoved -> page.links.removeAll { l -> c.links.any { it.id == l.id } }
+            is CanvasCommand.LinkChanged -> swapLinks(c.old, c.new)
         }
         changed(content = true)
     }
@@ -151,6 +172,55 @@ open class CanvasViewModel : ViewModel() {
     private fun removeAll(list: List<Stroke>) {
         strokes.removeAll { s -> list.any { it === s } }
     }
+
+    // --- Ссылки на выделенное ---
+
+    /** Заменить ссылки [from] ссылками [to] по идентификатору (id сохраняется при переносе). */
+    private fun swapLinks(from: List<DocLink>, to: List<DocLink>) {
+        if (from.isEmpty() && to.isEmpty()) return
+        val ids = from.map { it.id }.toSet()
+        page.links.removeAll { it.id in ids }
+        page.links += to
+    }
+
+    /** Ссылки текущей страницы, область которых пересекает рамку выделения — их можно изменить или удалить. */
+    fun selectedLinks(): List<DocLink> {
+        val area = StrokeOps.bounds(selection) ?: return emptyList()
+        return page.links.filter { it.bounds.intersects(area) }
+    }
+
+    /** Создать ссылку на область [area] текущей страницы с целью [target] (одна команда истории). */
+    fun addLink(area: Bounds, target: LinkTarget): DocLink {
+        val link = DocLink(DocLink.newId(), page.id, area.left, area.top, area.right, area.bottom, target)
+        page.links += link
+        page.history.push(CanvasCommand.LinkAdded(link))
+        changed(content = true)
+        return link
+    }
+
+    /** Удалить ссылки (одна команда истории). */
+    fun removeLinks(links: List<DocLink>) {
+        if (links.isEmpty()) return
+        val ids = links.map { it.id }.toSet()
+        val removed = page.links.filter { it.id in ids }
+        page.links.removeAll { it.id in ids }
+        page.history.push(CanvasCommand.LinkRemoved(removed))
+        changed(content = true)
+    }
+
+    /** Сменить цель ссылок (одна команда истории). */
+    fun retargetLinks(links: List<DocLink>, target: LinkTarget) {
+        if (links.isEmpty()) return
+        val ids = links.map { it.id }.toSet()
+        val old = page.links.filter { it.id in ids }
+        val new = old.map { it.copy(target = target) }
+        swapLinks(old, new)
+        page.history.push(CanvasCommand.LinkChanged(old, new))
+        changed(content = true)
+    }
+
+    /** Ссылка под точкой страницы (x, y), если есть; верхняя — последняя созданная. */
+    fun linkAt(x: Float, y: Float): DocLink? = page.links.lastOrNull { it.contains(x, y) }
 
     // --- Выделение (лассо) ---
 
@@ -169,14 +239,24 @@ open class CanvasViewModel : ViewModel() {
      * Заменить выделенные штрихи новыми (перемещение, масштаб, перекраска) одной командой.
      * [replacement] — штрихи в том же порядке; новые становятся выделением.
      */
-    fun replaceSelection(replacement: List<Stroke>) {
+    fun replaceSelection(replacement: List<Stroke>, transform: SelectionTransform? = null) {
         val old = selection
         if (old.isEmpty() || replacement.isEmpty()) return
+        // Ссылки, целиком попавшие в рамку выделения, едут и масштабируются вместе со штрихами; задетые частично остаются
+        var linksOld = emptyList<DocLink>()
+        var linksNew = emptyList<DocLink>()
+        if (transform != null && !transform.isIdentity) {
+            StrokeOps.bounds(old)?.let { area ->
+                linksOld = page.links.filter { it.insideOf(area) }
+                linksNew = linksOld.map { it.transformed(transform) }
+            }
+        }
         // Новые штрихи встают на место старых — порядок наложения сохраняется
         val firstIndex = strokes.indexOfFirst { s -> old.any { it === s } }.coerceAtLeast(0)
         removeAll(old)
         strokes.addAll(firstIndex.coerceAtMost(strokes.size), replacement)
-        page.history.push(CanvasCommand.Replace(old, replacement))
+        page.history.push(CanvasCommand.Replace(old, replacement, linksOld, linksNew))
+        swapLinks(linksOld, linksNew)
         selection = replacement
         changed(content = true)
     }

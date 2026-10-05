@@ -43,6 +43,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
     private val strokesLayer = StrokesLayer(context)
     private val inProgress = InProgressStrokesView(context)
+    private val linksLayer = LinksLayer(context)
     private val overlay = SelectionOverlay(context)
     private val minimap = MinimapLayer(context)
     private val predictor = MotionEventPredictor.newInstance(this)
@@ -83,6 +84,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
     init {
         addView(strokesLayer, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(linksLayer, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(inProgress, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(overlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(minimap, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -118,7 +120,15 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     var minimapInsetStartDp = 0f
         set(value) { if (field != value) { field = value; minimap.invalidate() } }
 
+    /** Нажатие пальцем по области ссылки; null — переходы по ссылкам выключены (например, на экране «Холст»). */
+    var onLinkClick: ((DocLink) -> Unit)? = null
+
+    /** Ссылки, цель которых недоступна: рисуются приглушённо. */
+    var dimmedLinks: Set<String> = emptySet()
+        set(value) { if (field != value) { field = value; linksLayer.invalidate() } }
+
     private fun invalidateLayers() {
+        linksLayer.invalidate()
         strokesLayer.invalidate()
         overlay.invalidate()
         minimap.invalidate()
@@ -197,6 +207,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             gestureStart = ev.eventTime
             gestureMaxFingers = 0
             gestureTravel = 0f
+            gestureStartWorld = worldPoint(ev.getX(i), ev.getY(i))
         }
         fingers[id] = floatArrayOf(ev.getX(i), ev.getY(i))
         gestureMaxFingers = maxOf(gestureMaxFingers, fingers.size)
@@ -294,7 +305,9 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         if (ids.isEmpty()) return
         val vp = vm.viewport
 
-        if (ids.size == 1) {
+        if (vm.viewLocked) {
+            // Вид заблокирован: только запоминаем позиции, ничего не двигаем
+        } else if (ids.size == 1) {
             val i = ev.findPointerIndex(ids[0])
             val last = fingers.getValue(ids[0])
             val dx = ev.getX(i) - last[0]
@@ -326,12 +339,19 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
         invalidateLayers()
     }
 
+    // Где коснулся первый палец (мир) — для тапа по ссылке
+    private var gestureStartWorld = floatArrayOf(0f, 0f)
+
     private fun onGestureEnd(time: Long) {
         // Короткий тап без движения: два пальца — отмена, три — повтор
         val tap = time - gestureStart < TAP_MAX_MS && gestureTravel < TAP_MAX_TRAVEL_DP * density
         if (tap && gestureMaxFingers == 2) vm.undo()
         if (tap && gestureMaxFingers == 3) vm.redo()
         if (tap && gestureMaxFingers >= 2) strokesLayer.invalidate()
+        // Тап одним пальцем по области ссылки открывает цель; перо поверх ссылки по-прежнему пишет
+        if (tap && gestureMaxFingers == 1) {
+            vm.linkAt(gestureStartWorld[0], gestureStartWorld[1])?.let { onLinkClick?.invoke(it) }
+        }
     }
 
     // --- Лассо ---
@@ -407,7 +427,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
             LassoMode.MOVE, LassoMode.SCALE -> {
                 val t = preview
                 if (t != null && !t.isIdentity) {
-                    vm.replaceSelection(vm.selection.map { StrokeOps.transformed(it, t) })
+                    vm.replaceSelection(vm.selection.map { StrokeOps.transformed(it, t) }, t)
                 }
             }
         }
@@ -448,6 +468,34 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     private fun finishErasing() {
         vm.commitErase(erasedNow.toList())
         erasedNow.clear()
+    }
+
+    /** Подсветка областей ссылок: лёгкий фон и подчёркивание; в штрихи и PDF не попадает. */
+    private inner class LinksLayer(context: Context) : View(context) {
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val links = vm.page.links
+            if (links.isEmpty()) return
+            val vp = vm.viewport
+            for (l in links) {
+                // Приглушённая ссылка (цель недоступна) — серая, обычная — синяя
+                val dim = l.id in dimmedLinks
+                fill.color = if (dim) Color.argb(0x1A, 0x80, 0x80, 0x80) else Color.argb(0x26, 0x1F, 0x4E, 0xC9)
+                line.color = if (dim) Color.argb(0x99, 0x80, 0x80, 0x80) else Color.argb(0xCC, 0x1F, 0x4E, 0xC9)
+                line.strokeWidth = 2f * density
+                val left = vp.worldToScreenX(l.left)
+                val right = vp.worldToScreenX(l.right)
+                val top = vp.worldToScreenY(l.top)
+                val bottom = vp.worldToScreenY(l.bottom)
+                canvas.drawRoundRect(left, top, right, bottom, 4f * density, 4f * density, fill)
+                canvas.drawLine(left, bottom, right, bottom, line)
+            }
+        }
     }
 
     /** Слой готовых штрихов: фон (стол, лист, шаблон) и все штрихи текущей страницы. */
@@ -804,6 +852,7 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
 
         /** Перенести центр вида в мировую точку под точкой карты. */
         private fun jumpTo(x: Float, y: Float) {
+            if (vm.viewLocked) return
             val l = frozen ?: return
             val r = rect()
             val wx = l[0] + (x - r.left - l[3]) / l[2]

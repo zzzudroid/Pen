@@ -19,6 +19,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.FullscreenExit
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilledIconToggleButton
@@ -91,6 +93,13 @@ fun FullscreenToolbar(vm: CanvasViewModel, onExit: () -> Unit, modifier: Modifie
                     modifier = Modifier.size(ButtonSize),
                 ) {
                     Icon(Icons.Outlined.TouchApp, contentDescription = "Стирать пальцем", modifier = Modifier.size(24.dp))
+                }
+                FilledIconToggleButton(
+                    checked = vm.viewLocked,
+                    onCheckedChange = { vm.viewLocked = it },
+                    modifier = Modifier.size(ButtonSize),
+                ) {
+                    Icon(if (vm.viewLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen, contentDescription = "Заблокировать перемещение поля", modifier = Modifier.size(24.dp))
                 }
                 BarDivider()
                 IconButton(onClick = vm::undo, enabled = vm.canUndo, modifier = Modifier.size(ButtonSize)) {
