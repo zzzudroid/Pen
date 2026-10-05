@@ -131,6 +131,7 @@ fun NoteEditorScreen(onBack: () -> Unit, vm: NotebookViewModel = viewModel()) {
                 meta == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else -> Column(Modifier.fillMaxSize()) {
                     CanvasToolbar(vm)
+                    SelectionBar(vm)
                     AndroidView(
                         factory = { ctx -> DrawingSurface(ctx, vm) },
                         // Чтение version подписывает перерисовку холста на изменения модели

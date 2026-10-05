@@ -58,7 +58,10 @@ object NotebookStore {
         val now = System.currentTimeMillis()
         val spec = PageSpec.a4(template)
         val pageId = CanvasViewModel.newPageId()
-        val meta = NotebookMeta(title.trim().ifEmpty { "Без названия" }, template, spec.width, spec.height, now, now, listOf(pageId))
+        val meta = NotebookMeta(
+            title.trim().ifEmpty { "Без названия" }, template, spec.width, spec.height, now, now,
+            listOf(PageMeta(pageId, spec.width, spec.height, template)),
+        )
         NotebookFormat.write(File(root, name), meta, emptyMap())
         // PDF пустой тетради — сразу, чтобы копия для ПК была с самого начала
         try {
@@ -74,19 +77,38 @@ object NotebookStore {
         val src = file(id)
         val meta = NotebookFormat.readMeta(src)
         val pages = NotebookFormat.readPages(src, meta)
+        // PDF-подложку переносим в новый файл через временную копию
+        val source = if (meta.hasPdfSource) {
+            File.createTempFile("rename-src", ".pdf").also { NotebookFormat.extractPdfSource(src, it) }
+        } else null
+        try {
+            return renameWithSource(id, src, meta, pages, newTitle, source)
+        } finally {
+            source?.delete()
+        }
+    }
+
+    private fun renameWithSource(
+        id: String,
+        src: File,
+        meta: NotebookMeta,
+        pages: Map<String, List<androidx.ink.strokes.Stroke>>,
+        newTitle: String,
+        source: File?,
+    ): String {
         val name = FileNames.unique(newTitle) { candidate ->
             !candidate.equals(id, ignoreCase = true) && nameTaken(candidate)
         }
         val newMeta = meta.copy(title = newTitle.trim().ifEmpty { meta.title })
         if (name.equals(id, ignoreCase = true)) {
             // /sdcard не различает регистр: пишем в тот же файл, затем меняем регистр имени через промежуточное
-            NotebookFormat.write(src, newMeta, pages)
+            NotebookFormat.write(src, newMeta, pages, source)
             if (name != id) {
                 val tmp = File(root, "$name.rename")
                 if (!src.renameTo(tmp) || !tmp.renameTo(File(root, name))) throw IOException("Не удалось переименовать $id")
             }
         } else {
-            NotebookFormat.write(File(root, name), newMeta, pages)
+            NotebookFormat.write(File(root, name), newMeta, pages, source)
             if (!src.delete()) throw IOException("Не удалось удалить старый файл ${src.name}")
         }
         renamePdf(id, name)

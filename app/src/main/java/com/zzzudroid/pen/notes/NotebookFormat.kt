@@ -24,9 +24,21 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+
+/** Описание одной страницы в meta.json: размер, шаблон, страница PDF-подложки. */
+data class PageMeta(
+    val id: String,
+    val width: Float,
+    val height: Float,
+    val template: PageTemplate,
+    val pdfPage: Int? = null,
+) {
+    val spec get() = PageSpec(width, height, template)
+}
 
 /** Метаданные тетради — содержимое meta.json. */
 data class NotebookMeta(
@@ -36,44 +48,60 @@ data class NotebookMeta(
     val pageHeight: Float,
     val created: Long,
     val modified: Long,
-    val pageIds: List<String>,
+    val pages: List<PageMeta>,
+    /** В zip лежит исходный PDF (source.pdf) — подложка страниц с pdfPage. */
+    val hasPdfSource: Boolean = false,
 ) {
+    /** Общий размер и шаблон тетради — для новых обычных страниц. */
     val pageSpec get() = PageSpec(pageWidth, pageHeight, template)
+    val pageIds: List<String> get() = pages.map { it.id }
 }
 
 /**
- * Формат .pen, версия 1 — zip:
- *  meta.json            — метаданные (читаемый JSON)
+ * Формат .pen, версия 2 — zip:
+ *  meta.json            — метаданные (читаемый JSON), pageInfo — размеры и подложки страниц
  *  pages/<id>.strokes   — штрихи страницы (DataOutputStream, см. [writeStrokes])
  *  thumb.png            — миниатюра первой страницы
+ *  source.pdf           — исходный PDF, если тетрадь создана импортом PDF
+ * Версия 1 отличается отсутствием pageInfo и source.pdf — читается как тетрадь с общим размером страниц.
  */
 object NotebookFormat {
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
     private const val META = "meta.json"
     private const val THUMB = "thumb.png"
+    private const val SOURCE_PDF = "source.pdf"
     private const val THUMB_WIDTH = 300
     private fun pageEntry(id: String) = "pages/$id.strokes"
 
     // --- Запись ---
 
-    /** Записать тетрадь атомарно: во временный файл, затем переименование поверх. */
-    fun write(file: File, meta: NotebookMeta, pages: Map<String, List<Stroke>>) {
+    /**
+     * Записать тетрадь атомарно: во временный файл, затем переименование поверх.
+     * [pdfSource] — исходный PDF-подложка; копируется в zip как source.pdf.
+     */
+    fun write(file: File, meta: NotebookMeta, pages: Map<String, List<Stroke>>, pdfSource: File? = null) {
         val tmp = File(file.parentFile, file.name + ".tmp")
+        val finalMeta = meta.copy(hasPdfSource = pdfSource != null)
         FileOutputStream(tmp).use { fos ->
             ZipOutputStream(fos.buffered()).use { zip ->
                 zip.putNextEntry(ZipEntry(META))
-                zip.write(metaToJson(meta).toString(2).toByteArray())
+                zip.write(metaToJson(finalMeta).toString(2).toByteArray())
                 zip.closeEntry()
-                for (id in meta.pageIds) {
+                for (id in finalMeta.pageIds) {
                     zip.putNextEntry(ZipEntry(pageEntry(id)))
                     zip.write(writeStrokes(pages[id].orEmpty()))
                     zip.closeEntry()
                 }
                 zip.putNextEntry(ZipEntry(THUMB))
-                val thumb = renderThumbnail(meta.pageSpec, pages[meta.pageIds.firstOrNull()].orEmpty())
+                val thumb = renderThumbnail(finalMeta.pages.firstOrNull(), finalMeta.pageSpec, pages[finalMeta.pageIds.firstOrNull()].orEmpty(), pdfSource)
                 thumb.compress(Bitmap.CompressFormat.PNG, 100, zip)
                 thumb.recycle()
                 zip.closeEntry()
+                if (pdfSource != null) {
+                    zip.putNextEntry(ZipEntry(SOURCE_PDF))
+                    pdfSource.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
                 zip.flush()
                 fos.fd.sync()
             }
@@ -95,6 +123,16 @@ object NotebookFormat {
         put("created", m.created)
         put("modified", m.modified)
         put("pages", JSONArray(m.pageIds))
+        put("hasPdfSource", m.hasPdfSource)
+        put("pageInfo", JSONArray(m.pages.map { p ->
+            JSONObject().apply {
+                put("id", p.id)
+                put("width", p.width.toDouble())
+                put("height", p.height.toDouble())
+                put("template", p.template.id)
+                p.pdfPage?.let { put("pdfPage", it) }
+            }
+        }))
     }
 
     /** Штрихи страницы: число штрихов, затем для каждого — кисть и входные точки Ink. */
@@ -124,15 +162,35 @@ object NotebookFormat {
         val j = JSONObject(text)
         val version = j.optInt("formatVersion", 1)
         if (version > FORMAT_VERSION) throw IOException("Файл новой версии формата ($version), обновите приложение")
-        val ids = j.getJSONArray("pages")
+        val template = PageTemplate.byId(j.optString("template"))
+        val width = j.getDouble("pageWidth").toFloat()
+        val height = j.getDouble("pageHeight").toFloat()
+        val info = j.optJSONArray("pageInfo")
+        val pages = if (info != null) {
+            List(info.length()) { i ->
+                val p = info.getJSONObject(i)
+                PageMeta(
+                    id = p.getString("id"),
+                    width = p.optDouble("width", width.toDouble()).toFloat(),
+                    height = p.optDouble("height", height.toDouble()).toFloat(),
+                    template = PageTemplate.byId(p.optString("template", template.id)),
+                    pdfPage = if (p.has("pdfPage")) p.getInt("pdfPage") else null,
+                )
+            }
+        } else {
+            // Версия 1: все страницы одного размера и шаблона
+            val ids = j.getJSONArray("pages")
+            List(ids.length()) { PageMeta(ids.getString(it), width, height, template) }
+        }
         NotebookMeta(
             title = j.optString("title", file.nameWithoutExtension),
-            template = PageTemplate.byId(j.optString("template")),
-            pageWidth = j.getDouble("pageWidth").toFloat(),
-            pageHeight = j.getDouble("pageHeight").toFloat(),
+            template = template,
+            pageWidth = width,
+            pageHeight = height,
             created = j.optLong("created", file.lastModified()),
             modified = j.optLong("modified", file.lastModified()),
-            pageIds = List(ids.length()) { ids.getString(it) },
+            pages = pages,
+            hasPdfSource = zip.getEntry(SOURCE_PDF) != null,
         )
     }
 
@@ -141,6 +199,19 @@ object NotebookFormat {
             val entry = zip.getEntry(pageEntry(id)) ?: return@associateWith emptyList()
             readStrokes(zip.getInputStream(entry).readBytes())
         }
+    }
+
+    /** Скопировать source.pdf из тетради в [dst]; false — если подложки нет. */
+    fun extractPdfSource(file: File, dst: File): Boolean = ZipFile(file).use { zip ->
+        val entry = zip.getEntry(SOURCE_PDF) ?: return false
+        dst.parentFile?.mkdirs()
+        val tmp = File(dst.parentFile, dst.name + ".tmp")
+        zip.getInputStream(entry).use { input: InputStream -> tmp.outputStream().use { input.copyTo(it) } }
+        if (!tmp.renameTo(dst)) {
+            tmp.delete()
+            throw IOException("Не удалось извлечь PDF-подложку")
+        }
+        true
     }
 
     private fun readStrokes(bytes: ByteArray): List<Stroke> = DataInputStream(ByteArrayInputStream(bytes)).use { d ->
@@ -169,12 +240,23 @@ object NotebookFormat {
 
     private val renderer by lazy { CanvasStrokeRenderer.create() }
 
-    private fun renderThumbnail(spec: PageSpec, strokes: List<Stroke>): Bitmap {
+    private fun renderThumbnail(first: PageMeta?, fallback: PageSpec, strokes: List<Stroke>, pdfSource: File?): Bitmap {
+        val spec = first?.spec ?: fallback
         val scale = THUMB_WIDTH / spec.width
-        val bmp = Bitmap.createBitmap(THUMB_WIDTH, (spec.height * scale).toInt(), Bitmap.Config.ARGB_8888)
+        val bmp = Bitmap.createBitmap(THUMB_WIDTH, (spec.height * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-        c.scale(scale, scale)
-        drawPage(c, spec, scale)
+        val pdfPage = first?.pdfPage
+        if (pdfPage != null && pdfSource != null) {
+            // Подложка первой страницы — растр исходного PDF
+            PdfRendering.renderPage(pdfSource, pdfPage, bmp.width, bmp.height)?.let { page ->
+                c.drawBitmap(page, 0f, 0f, null)
+                page.recycle()
+            }
+            c.scale(scale, scale)
+        } else {
+            c.scale(scale, scale)
+            drawPage(c, spec, scale)
+        }
         val identity = Matrix()
         for (s in strokes) renderer.draw(c, s, identity)
         return bmp

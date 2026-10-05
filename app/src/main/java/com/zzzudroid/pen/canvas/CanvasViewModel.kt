@@ -19,12 +19,19 @@ enum class CanvasTool(val title: String, val id: String) {
     MARKER("Маркер", "marker"),
     HIGHLIGHTER("Выделитель", "highlighter"),
     ERASER("Ластик", "eraser"),
+    LASSO("Лассо", "lasso"),
 }
 
 /** Команда истории холста. */
 sealed interface CanvasCommand {
     class Add(val stroke: Stroke) : CanvasCommand
     class Erase(val strokes: List<Stroke>) : CanvasCommand
+
+    /** Замена штрихов: перемещение, масштаб, перекраска выделения. */
+    class Replace(val removed: List<Stroke>, val added: List<Stroke>) : CanvasCommand
+
+    /** Добавление нескольких штрихов разом (копия выделения). */
+    class AddMany(val strokes: List<Stroke>) : CanvasCommand
 }
 
 /** Палитра: чёрный, синий, красный, зелёный, оранжевый, фиолетовый. */
@@ -47,7 +54,7 @@ object Brushes {
         CanvasTool.PEN -> pen
         CanvasTool.MARKER -> marker
         CanvasTool.HIGHLIGHTER -> highlighter
-        CanvasTool.ERASER -> null
+        CanvasTool.ERASER, CanvasTool.LASSO -> null
     }
 
     /** Инструмент по семейству кисти штриха (сравнение по значению). */
@@ -69,8 +76,11 @@ open class CanvasViewModel : ViewModel() {
     val page get() = pages[pageIndex]
     val strokes get() = page.strokes
 
-    /** Границы и шаблон страниц; null — безграничный холст. */
-    var pageSpec: PageSpec? = null; protected set
+    /** Общие границы и шаблон страниц тетради; null — безграничный холст. */
+    protected var defaultPageSpec: PageSpec? = null
+
+    /** Границы и шаблон текущей страницы (свои у PDF-страниц); null — безграничный холст. */
+    val pageSpec: PageSpec? get() = page.spec ?: defaultPageSpec
 
     val viewport = Viewport()
     private var viewWidth = 0
@@ -85,6 +95,9 @@ open class CanvasViewModel : ViewModel() {
     var sizeIndex by mutableIntStateOf(1)
     var drawWithFinger by mutableStateOf(false)
 
+    /** Выделенные лассо штрихи текущей страницы (ссылки на объекты из [strokes]). */
+    var selection by mutableStateOf<List<Stroke>>(emptyList()); private set
+
     val canUndo get() = version.let { page.history.canUndo }
     val canRedo get() = version.let { page.history.canRedo }
 
@@ -97,6 +110,7 @@ open class CanvasViewModel : ViewModel() {
     /** Стёртые одним движением ластика штрихи — одна команда. */
     fun commitErase(erased: List<Stroke>) {
         if (erased.isEmpty()) return
+        selection = emptyList()
         page.history.push(CanvasCommand.Erase(erased))
         changed(content = true)
     }
@@ -107,18 +121,77 @@ open class CanvasViewModel : ViewModel() {
     }
 
     fun undo() {
-        when (val c = page.history.undo() ?: return) {
-            is CanvasCommand.Add -> strokes.removeAll { it === c.stroke }
+        val c = page.history.undo() ?: return
+        selection = emptyList()
+        when (c) {
+            is CanvasCommand.Add -> removeAll(listOf(c.stroke))
             is CanvasCommand.Erase -> strokes += c.strokes
+            is CanvasCommand.Replace -> { removeAll(c.added); strokes += c.removed }
+            is CanvasCommand.AddMany -> removeAll(c.strokes)
         }
         changed(content = true)
     }
 
     fun redo() {
-        when (val c = page.history.redo() ?: return) {
+        val c = page.history.redo() ?: return
+        selection = emptyList()
+        when (c) {
             is CanvasCommand.Add -> strokes += c.stroke
-            is CanvasCommand.Erase -> c.strokes.forEach { s -> strokes.removeAll { it === s } }
+            is CanvasCommand.Erase -> removeAll(c.strokes)
+            is CanvasCommand.Replace -> { removeAll(c.removed); strokes += c.added }
+            is CanvasCommand.AddMany -> strokes += c.strokes
         }
+        changed(content = true)
+    }
+
+    private fun removeAll(list: List<Stroke>) {
+        strokes.removeAll { s -> list.any { it === s } }
+    }
+
+    // --- Выделение (лассо) ---
+
+    fun select(strokes: List<Stroke>) {
+        selection = strokes
+        changed(content = false)
+    }
+
+    fun clearSelection() {
+        if (selection.isEmpty()) return
+        selection = emptyList()
+        changed(content = false)
+    }
+
+    /**
+     * Заменить выделенные штрихи новыми (перемещение, масштаб, перекраска) одной командой.
+     * [replacement] — штрихи в том же порядке; новые становятся выделением.
+     */
+    fun replaceSelection(replacement: List<Stroke>) {
+        val old = selection
+        if (old.isEmpty() || replacement.isEmpty()) return
+        // Новые штрихи встают на место старых — порядок наложения сохраняется
+        val firstIndex = strokes.indexOfFirst { s -> old.any { it === s } }.coerceAtLeast(0)
+        removeAll(old)
+        strokes.addAll(firstIndex.coerceAtMost(strokes.size), replacement)
+        page.history.push(CanvasCommand.Replace(old, replacement))
+        selection = replacement
+        changed(content = true)
+    }
+
+    fun deleteSelection() {
+        val old = selection
+        if (old.isEmpty()) return
+        removeAll(old)
+        page.history.push(CanvasCommand.Erase(old))
+        selection = emptyList()
+        changed(content = true)
+    }
+
+    /** Добавить копии (уже сдвинутые вызывающим кодом) поверх и выделить их. */
+    fun addCopies(copies: List<Stroke>) {
+        if (copies.isEmpty()) return
+        strokes += copies
+        page.history.push(CanvasCommand.AddMany(copies))
+        selection = copies
         changed(content = true)
     }
 
@@ -126,6 +199,7 @@ open class CanvasViewModel : ViewModel() {
 
     fun goToPage(index: Int) {
         if (index !in pages.indices || index == pageIndex) return
+        selection = emptyList()
         pageIndex = index
         fitPage()
         changed(content = false)
@@ -133,7 +207,9 @@ open class CanvasViewModel : ViewModel() {
 
     /** Добавить пустую страницу после текущей и перейти на неё. */
     fun addPageAfterCurrent() {
-        pages.add(pageIndex + 1, PageState(newPageId()))
+        selection = emptyList()
+        // Новая страница — обычный лист с шаблоном тетради, без PDF-подложки
+        pages.add(pageIndex + 1, PageState(newPageId(), spec = defaultPageSpec))
         pageIndex++
         fitPage()
         changed(content = true)
@@ -142,6 +218,7 @@ open class CanvasViewModel : ViewModel() {
     /** Удалить текущую страницу (последнюю удалить нельзя). */
     fun deleteCurrentPage(): Boolean {
         if (pages.size <= 1) return false
+        selection = emptyList()
         pages.removeAt(pageIndex)
         if (pageIndex >= pages.size) pageIndex = pages.size - 1
         fitPage()
@@ -151,7 +228,7 @@ open class CanvasViewModel : ViewModel() {
 
     /** Заменить содержимое (загрузка тетради). */
     protected fun replacePages(spec: PageSpec?, newPages: List<PageState>) {
-        pageSpec = spec
+        defaultPageSpec = spec
         pages.clear()
         pages += newPages.ifEmpty { listOf(PageState(newPageId())) }
         pageIndex = 0

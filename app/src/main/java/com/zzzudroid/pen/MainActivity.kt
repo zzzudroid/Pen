@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.zzzudroid.pen.canvas.StylusPresence
 import com.zzzudroid.pen.diag.DiagnosticsViewModel
+import com.zzzudroid.pen.notes.PdfSources
 import com.zzzudroid.pen.ui.AppRoot
 
 class MainActivity : ComponentActivity() {
@@ -19,6 +20,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Папка для извлечённых PDF-подложок тетрадей
+        PdfSources.init(this)
         enableEdgeToEdge()
         setContent { AppRoot(diagnostics) }
     }

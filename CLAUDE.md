@@ -40,6 +40,9 @@ adb logcat -s PenDiag
 - `notes/` — тетради: `NotebookStore` (Documents/Pen, уникальные имена, атомарная запись, rename с учётом
   регистронезависимости /sdcard), `NotebookFormat` (формат `.pen` v1), `NotebookViewModel` (наследник
   `CanvasViewModel`, автосохранение в `NotebookStore.saveScope` под `writeLock`), `FileNames` (чистый Kotlin, тесты).
+- Лассо: `canvas/Lasso.kt` (чистая геометрия, тесты), `canvas/StrokeOps.kt` (новые штрихи Ink из преобразованных
+  точек — штрихи неизменяемы), режим лассо и превью в `DrawingSurface`, `ui/SelectionBar.kt`. История: `Replace`,
+  `AddMany`; выделение — ссылки на объекты штрихов, снимается при любой смене истории/страницы.
 - `notes/PdfExporter` — векторный PDF рядом с `.pen` (контуры `outlinesToPath`, не `CanvasStrokeRenderer`),
   пишется под тем же `writeLock` сразу после `.pen`; ошибка PDF не откатывает `.pen` (`pdfError`).
   «Поделиться» — `FileProvider` (`${applicationId}.files`), перед отправкой `saveAndAwait()`.

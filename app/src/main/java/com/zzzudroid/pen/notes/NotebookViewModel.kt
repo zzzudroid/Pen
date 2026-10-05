@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** Холст тетради: загрузка из файла и автосохранение. */
 class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
@@ -23,6 +24,9 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     var meta by mutableStateOf<NotebookMeta?>(null); private set
     var loadError by mutableStateOf<String?>(null); private set
     var saveError by mutableStateOf<String?>(null); private set
+
+    /** Извлечённый исходный PDF (подложка страниц с pdfPage); null — у тетради его нет. */
+    var pdfSource by mutableStateOf<File?>(null); private set
 
     /** Ошибка автоэкспорта PDF — отдельно: .pen при этом сохранён. */
     var pdfError by mutableStateOf<String?>(null); private set
@@ -34,16 +38,18 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     init {
         viewModelScope.launch {
             try {
-                val (m, pages) = withContext(Dispatchers.IO) {
+                val (m, pages, source) = withContext(Dispatchers.IO) {
                     // Ждём возможное незаконченное сохранение этой же тетради
                     NotebookStore.writeLock.withLock {
                         val f = NotebookStore.file(id)
                         val m = NotebookFormat.readMeta(f)
-                        m to NotebookFormat.readPages(f, m)
+                        val source = if (m.hasPdfSource) PdfSources.extract(id) else null
+                        Triple(m, NotebookFormat.readPages(f, m), source)
                     }
                 }
-                replacePages(m.pageSpec, m.pageIds.map { pid ->
-                    PageState(pid).also { it.strokes += pages[pid].orEmpty() }
+                pdfSource = source
+                replacePages(m.pageSpec, m.pages.map { pm ->
+                    PageState(pm.id, spec = pm.spec, pdfPage = pm.pdfPage).also { it.strokes += pages[pm.id].orEmpty() }
                 })
                 meta = m
                 loaded = true
@@ -88,18 +94,26 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
         if (!dirty) return null
         dirty = false
         val snapshot = pages.associate { it.id to it.strokes.toList() }
-        val newMeta = m.copy(modified = System.currentTimeMillis(), pageIds = pages.map { it.id })
+        val fallback = m.pageSpec
+        val newMeta = m.copy(
+            modified = System.currentTimeMillis(),
+            pages = pages.map { p ->
+                val spec = p.spec ?: fallback
+                PageMeta(p.id, spec.width, spec.height, spec.template, p.pdfPage)
+            },
+        )
         meta = newMeta
+        val source = pdfSource
         val file = NotebookStore.file(id)
         val pdf = NotebookStore.pdfFile(id)
         return NotebookStore.saveScope.launch {
             try {
                 var pdfFailure: String? = null
                 NotebookStore.writeLock.withLock {
-                    NotebookFormat.write(file, newMeta, snapshot)
+                    NotebookFormat.write(file, newMeta, snapshot, source)
                     // PDF-копия для ПК; её сбой не делает .pen несохранённым
                     try {
-                        PdfExporter.write(pdf, newMeta, snapshot)
+                        PdfExporter.write(pdf, newMeta, snapshot, source)
                     } catch (e: Exception) {
                         Log.e(TAG, "Не удалось экспортировать PDF $id", e)
                         pdfFailure = e.message ?: e.javaClass.simpleName

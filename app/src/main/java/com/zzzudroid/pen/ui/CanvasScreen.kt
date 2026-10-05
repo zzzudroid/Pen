@@ -77,6 +77,7 @@ fun CanvasScreen(onBack: () -> Unit, vm: CanvasViewModel = viewModel()) {
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             CanvasToolbar(vm)
+            SelectionBar(vm)
             AndroidView(
                 factory = { ctx -> DrawingSurface(ctx, vm) },
                 // Чтение version подписывает перерисовку холста на изменения модели
@@ -99,7 +100,15 @@ fun CanvasToolbar(vm: CanvasViewModel) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CanvasTool.entries.forEach { t ->
-            FilterChip(selected = vm.tool == t, onClick = { vm.tool = t }, label = { Text(t.title) })
+            FilterChip(
+                selected = vm.tool == t,
+                onClick = {
+                    // Уход с лассо снимает выделение
+                    if (t != CanvasTool.LASSO) vm.clearSelection()
+                    vm.tool = t
+                },
+                label = { Text(t.title) },
+            )
         }
 
         VerticalDivider(Modifier.padding(horizontal = 4.dp).size(1.dp, 32.dp))

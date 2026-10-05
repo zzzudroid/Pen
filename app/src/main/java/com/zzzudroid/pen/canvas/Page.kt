@@ -26,8 +26,12 @@ data class PageSpec(val width: Float, val height: Float, val template: PageTempl
     }
 }
 
-/** Одна страница: штрихи и собственная история отмены. */
-class PageState(val id: String) {
+/**
+ * Одна страница: штрихи и собственная история отмены.
+ * [spec] — размер и шаблон именно этой страницы (null — общий spec тетради),
+ * [pdfPage] — индекс страницы исходного PDF-подложки (0-based) или null.
+ */
+class PageState(val id: String, var spec: PageSpec? = null, val pdfPage: Int? = null) {
     val strokes = mutableListOf<Stroke>()
     val history = History<CanvasCommand>()
 }
