@@ -164,6 +164,7 @@ fun NotesListScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                         NotebookCard(
                             entry = e,
                             onOpen = { if (e.meta != null) onOpen(e.id) },
+                            onSharePdf = { sharePdf(context, NotebookStore.pdfFile(e.id)) },
                             onRename = { renaming = e },
                             onDelete = { deleting = e },
                         )
@@ -239,7 +240,13 @@ private fun AccessRequest(onGrant: () -> Unit) {
 }
 
 @Composable
-private fun NotebookCard(entry: NotebookEntry, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun NotebookCard(
+    entry: NotebookEntry,
+    onOpen: () -> Unit,
+    onSharePdf: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val thumb by produceState<Bitmap?>(null, entry.file, entry.meta?.modified) {
         value = withContext(Dispatchers.IO) { NotebookFormat.readThumbnail(entry.file) }
     }
@@ -270,6 +277,7 @@ private fun NotebookCard(entry: NotebookEntry, onOpen: () -> Unit, onRename: () 
                 IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Действия") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     if (entry.meta != null) {
+                        DropdownMenuItem(text = { Text("Поделиться PDF") }, onClick = { menu = false; onSharePdf() })
                         DropdownMenuItem(text = { Text("Переименовать") }, onClick = { menu = false; onRename() })
                     }
                     DropdownMenuItem(text = { Text("Удалить") }, onClick = { menu = false; onDelete() })

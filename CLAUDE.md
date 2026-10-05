@@ -40,6 +40,9 @@ adb logcat -s PenDiag
 - `notes/` — тетради: `NotebookStore` (Documents/Pen, уникальные имена, атомарная запись, rename с учётом
   регистронезависимости /sdcard), `NotebookFormat` (формат `.pen` v1), `NotebookViewModel` (наследник
   `CanvasViewModel`, автосохранение в `NotebookStore.saveScope` под `writeLock`), `FileNames` (чистый Kotlin, тесты).
+- `notes/PdfExporter` — векторный PDF рядом с `.pen` (контуры `outlinesToPath`, не `CanvasStrokeRenderer`),
+  пишется под тем же `writeLock` сразу после `.pen`; ошибка PDF не откатывает `.pen` (`pdfError`).
+  «Поделиться» — `FileProvider` (`${applicationId}.files`), перед отправкой `saveAndAwait()`.
 - API androidx.ink сверять по фактическим классам библиотеки (javap), документация к alpha-версиям расходится с 1.0.
 - `BuildConfig.BUILD_TIME / GIT_HASH / GIT_DIRTY` — для экрана «О программе»; генерация BuildConfig
   никогда не считается up-to-date.

@@ -36,6 +36,9 @@ object NotebookStore {
 
     fun file(id: String) = File(root, id)
 
+    /** PDF-копия тетради рядом с .pen: «Название.pen» → «Название.pdf». */
+    fun pdfFile(id: String): File = File(root, id.removeSuffix(FileNames.EXTENSION) + ".pdf")
+
     fun list(): List<NotebookEntry> {
         val files = root.listFiles { f -> f.isFile && f.name.endsWith(FileNames.EXTENSION) }.orEmpty()
         return files.map { f ->
@@ -57,6 +60,12 @@ object NotebookStore {
         val pageId = CanvasViewModel.newPageId()
         val meta = NotebookMeta(title.trim().ifEmpty { "Без названия" }, template, spec.width, spec.height, now, now, listOf(pageId))
         NotebookFormat.write(File(root, name), meta, emptyMap())
+        // PDF пустой тетради — сразу, чтобы копия для ПК была с самого начала
+        try {
+            PdfExporter.write(pdfFile(name), meta, emptyMap())
+        } catch (e: Exception) {
+            Log.w(TAG, "Не удалось создать PDF для $name", e)
+        }
         return name
     }
 
@@ -80,11 +89,33 @@ object NotebookStore {
             NotebookFormat.write(File(root, name), newMeta, pages)
             if (!src.delete()) throw IOException("Не удалось удалить старый файл ${src.name}")
         }
+        renamePdf(id, name)
         return name
+    }
+
+    /**
+     * Переименовать PDF-копию вслед за .pen. Сбой не критичен: PDF пересоздаётся
+     * при следующем сохранении тетради, поэтому только логируем.
+     */
+    private fun renamePdf(oldId: String, newId: String) {
+        val src = pdfFile(oldId)
+        if (!src.exists() || oldId == newId) return
+        val dst = pdfFile(newId)
+        val ok = if (oldId.equals(newId, ignoreCase = true)) {
+            // /sdcard не различает регистр — меняем регистр через промежуточное имя
+            val tmp = File(root, dst.name + ".rename")
+            src.renameTo(tmp) && tmp.renameTo(dst)
+        } else {
+            src.renameTo(dst)
+        }
+        if (!ok) Log.w(TAG, "Не удалось переименовать ${src.name} → ${dst.name}")
     }
 
     fun delete(id: String) {
         if (!file(id).delete()) throw IOException("Не удалось удалить $id")
+        // PDF-копии может и не быть — это не ошибка
+        val pdf = pdfFile(id)
+        if (pdf.exists() && !pdf.delete()) Log.w(TAG, "Не удалось удалить ${pdf.name}")
     }
 
     private fun nameTaken(name: String) =

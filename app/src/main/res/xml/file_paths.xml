@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Файлы, которые можно отдавать другим приложениям через FileProvider: PDF-копии тетрадей -->
+<paths>
+    <external-path name="pen" path="Documents/Pen/" />
+</paths>

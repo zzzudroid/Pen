@@ -24,6 +24,9 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     var loadError by mutableStateOf<String?>(null); private set
     var saveError by mutableStateOf<String?>(null); private set
 
+    /** Ошибка автоэкспорта PDF — отдельно: .pen при этом сохранён. */
+    var pdfError by mutableStateOf<String?>(null); private set
+
     private var loaded = false
     private var dirty = false
     private var saveJob: Job? = null
@@ -66,18 +69,46 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
      * запись идёт в области процесса — она доживёт до конца даже после закрытия экрана.
      */
     fun saveNow() {
+        startSave()
+    }
+
+    /**
+     * Сохранить и дождаться окончания записи (.pen и PDF) — например, перед «Поделиться PDF».
+     * Если изменений нет, всё равно ждём текущую запись, чтобы не отдать полузаписанный файл.
+     */
+    suspend fun saveAndAwait() {
+        val job = startSave()
+        if (job != null) job.join() else NotebookStore.writeLock.withLock { }
+    }
+
+    /** Запустить сохранение, если есть изменения; возвращает задачу записи или null. */
+    private fun startSave(): Job? {
         saveJob?.cancel()
-        val m = meta ?: return
-        if (!dirty) return
+        val m = meta ?: return null
+        if (!dirty) return null
         dirty = false
         val snapshot = pages.associate { it.id to it.strokes.toList() }
         val newMeta = m.copy(modified = System.currentTimeMillis(), pageIds = pages.map { it.id })
         meta = newMeta
         val file = NotebookStore.file(id)
-        NotebookStore.saveScope.launch {
+        val pdf = NotebookStore.pdfFile(id)
+        return NotebookStore.saveScope.launch {
             try {
-                NotebookStore.writeLock.withLock { NotebookFormat.write(file, newMeta, snapshot) }
-                withContext(Dispatchers.Main) { saveError = null }
+                var pdfFailure: String? = null
+                NotebookStore.writeLock.withLock {
+                    NotebookFormat.write(file, newMeta, snapshot)
+                    // PDF-копия для ПК; её сбой не делает .pen несохранённым
+                    try {
+                        PdfExporter.write(pdf, newMeta, snapshot)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Не удалось экспортировать PDF $id", e)
+                        pdfFailure = e.message ?: e.javaClass.simpleName
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    saveError = null
+                    pdfError = pdfFailure
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Не удалось сохранить $id", e)
                 withContext(Dispatchers.Main) {
