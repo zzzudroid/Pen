@@ -14,15 +14,20 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * Кэш растров страниц PDF-подложки для экрана. Растр рисуется ступенями ширины
- * (512…4096 px), чтобы при зуме не перерисовывать на каждый кадр.
+ * (512…4096 px, но не более 6 Мпикс на растр), чтобы при зуме не перерисовывать на каждый кадр.
  * Вызывать [get] с главного потока.
  */
 object PdfPageCache {
     private const val TAG = "PenPdf"
-    private const val MAX_BYTES = 96 * 1024 * 1024
+    private const val MAX_BYTES = 128 * 1024 * 1024
+
+    // Один растр — не больше ≈ 6 Мпикс (≈ 24 МБ): страница A4 на ступени 4096 px весила ≈ 95 МБ,
+    // занимала весь кэш и не выводилась (листы с 4-й страницы оставались пустыми)
+    private const val MAX_PIXELS = 6_000_000
 
     private data class Key(val path: String, val page: Int, val width: Int)
 
@@ -55,6 +60,10 @@ object PdfPageCache {
                 } catch (e: Exception) {
                     Log.w(TAG, "Не удалось отрисовать страницу $pdfPage", e)
                     null
+                } catch (e: OutOfMemoryError) {
+                    Log.w(TAG, "Не хватило памяти на страницу $pdfPage", e)
+                    cache.evictAll()
+                    null
                 }
                 withContext(Dispatchers.Main) {
                     pending.remove(key)
@@ -81,8 +90,11 @@ object PdfPageCache {
         val r = renderer(source)
         if (pdfPage !in 0 until r.pageCount) return null
         val (w, h) = r.openPage(pdfPage).use { it.width to it.height }
-        val height = (width.toFloat() * h / w).roundToInt().coerceAtLeast(1)
-        return PdfRendering.renderPage(r, pdfPage, width, height)
+        val ratio = h.toFloat() / w
+        // Ступень задаёт ширину, но площадь ограничена — иначе тяжёлые растры не помещаются в кэш
+        val fitWidth = minOf(width.toFloat(), sqrt(MAX_PIXELS / ratio)).roundToInt().coerceAtLeast(1)
+        val height = (fitWidth * ratio).roundToInt().coerceAtLeast(1)
+        return PdfRendering.renderPage(r, pdfPage, fitWidth, height)
     }
 
     private fun renderer(source: File): PdfRenderer {
