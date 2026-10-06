@@ -60,6 +60,7 @@ fun NotebookCard(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onTags: () -> Unit = {},
+    onInfo: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** Цвет надписей на светлой пастельной подложке главного экрана; null — обычная тёмная/светлая карточка темы. */
     ink: Color? = null,
@@ -96,16 +97,21 @@ fun NotebookCard(
                         DropdownMenuItem(text = { Text("Поделиться PDF") }, onClick = { menu = false; onSharePdf() })
                         DropdownMenuItem(text = { Text("Переименовать") }, onClick = { menu = false; onRename() })
                         DropdownMenuItem(text = { Text("Теги…") }, onClick = { menu = false; onTags() })
+                        DropdownMenuItem(text = { Text("Свойства") }, onClick = { menu = false; onInfo() })
                     }
                     DropdownMenuItem(text = { Text("Удалить") }, onClick = { menu = false; onDelete() })
                 }
             }
-            // Теги — ярлыки внизу миниатюры: два первых и «+N»
+            // Внизу миниатюры: плашка «Копия PDF» (если документ — импорт PDF) и под ней теги — два первых и «+N»
             val tags = entry.meta?.tags.orEmpty()
-            if (tags.isNotEmpty()) {
-                Row(Modifier.align(Alignment.BottomStart).padding(6.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
-                    tags.take(2).forEach { TagBadge(it) }
-                    if (tags.size > 2) TagBadge("+${tags.size - 2}")
+            val pdfCopy = entry.meta?.takeIf { it.hasPdfSource }
+            if (tags.isNotEmpty() || pdfCopy != null) {
+                Column(Modifier.align(Alignment.BottomStart).padding(6.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+                    pdfCopy?.let { PdfCopyBadge(it.hasInk) }
+                    if (tags.isNotEmpty()) Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+                        tags.take(2).forEach { TagBadge(it) }
+                        if (tags.size > 2) TagBadge("+${tags.size - 2}")
+                    }
                 }
             }
             // Размер файла сверху на миниатюре; тёмная полупрозрачная подложка читается и на светлой странице, и на тёмной доске
@@ -152,6 +158,22 @@ fun NotebookCard(
                 )
             }
         }
+    }
+}
+
+/**
+ * Плашка PDF-копии: документ создан импортом PDF, исходный файл не затронут. Янтарная «с заметками» —
+ * в копии есть рукописные пометки (удалять осторожно); тёмная «без заметок» — копию можно удалить без потерь.
+ */
+@Composable
+private fun PdfCopyBadge(hasInk: Boolean) {
+    // Две строки: на узкой карточке одна строка «Копия PDF · без заметок» обрезается
+    Column(
+        Modifier.background(if (hasInk) Color(0xFFFFC107) else Color(0xB3000000), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        val color = if (hasInk) Color.Black else Color.White
+        Text("Копия PDF", maxLines = 1, color = color, style = MaterialTheme.typography.labelSmall)
+        Text(if (hasInk) "с заметками" else "без заметок", maxLines = 1, color = color, style = MaterialTheme.typography.labelSmall)
     }
 }
 

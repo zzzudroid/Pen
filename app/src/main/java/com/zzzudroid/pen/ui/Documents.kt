@@ -38,6 +38,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.zzzudroid.pen.canvas.PageTemplate
+import com.zzzudroid.pen.notes.DocInfo
 import com.zzzudroid.pen.notes.HomeLogic
 import com.zzzudroid.pen.notes.NotebookEntry
 import com.zzzudroid.pen.notes.NotebookStore
@@ -68,6 +69,7 @@ class DocumentsState(
     var renaming by mutableStateOf<NotebookEntry?>(null)
     var deleting by mutableStateOf<NotebookEntry?>(null)
     var tagging by mutableStateOf<NotebookEntry?>(null)
+    var info by mutableStateOf<NotebookEntry?>(null)
 
     /** Выполнить операцию с хранилищем на IO, показать ошибку, если она случилась, и обновить список. */
     fun storeOp(action: () -> Unit) {
@@ -101,7 +103,7 @@ class DocumentsState(
         importing = true
         scope.launch {
             try {
-                val id = withContext(Dispatchers.IO) { NotebookStore.importPdf(context, uri, pdfTitle(context, uri)) }
+                val id = withContext(Dispatchers.IO) { NotebookStore.importPdf(context, uri, pdfTitle(context, uri), pdfDisplayName(context, uri)) }
                 onOpen(id)
             } catch (e: Exception) {
                 snackbar.showSnackbar("Не удалось открыть PDF: ${e.message ?: e.javaClass.simpleName}")
@@ -183,11 +185,13 @@ fun DocumentDialogs(state: DocumentsState) {
         )
     }
 
+    state.info?.let { e -> DocumentInfoDialog(e, onDismiss = { state.info = null }) }
+
     state.deleting?.let { e ->
         AlertDialog(
             onDismissRequest = { state.deleting = null },
             title = { Text("Удалить документ?") },
-            text = { Text("«${e.meta?.title ?: e.id}» будет удалён без возможности восстановления.") },
+            text = { Text(DocInfo.deleteWarning(e.meta?.title ?: e.id, e.meta)) },
             confirmButton = {
                 TextButton(onClick = {
                     state.deleting = null
@@ -239,14 +243,17 @@ fun TitleDialog(title: String, initial: String, confirm: String, onDismiss: () -
     )
 }
 
+/** Имя выбранного файла с расширением, как его видит система; null — не удалось узнать. */
+private fun pdfDisplayName(context: Context, uri: Uri): String? = try {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+    }
+} catch (e: Exception) {
+    null
+}
+
 /** Название тетради из имени выбранного PDF без расширения; запасной вариант — «PDF». */
 private fun pdfTitle(context: Context, uri: Uri): String {
-    val name = try {
-        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-            if (c.moveToFirst()) c.getString(0) else null
-        }
-    } catch (e: Exception) {
-        null
-    }
+    val name = pdfDisplayName(context, uri)
     return name?.removeSuffix(".pdf")?.removeSuffix(".PDF")?.trim()?.ifEmpty { null } ?: "PDF"
 }

@@ -136,6 +136,7 @@ fun HomeScreen(
                         onRename = { docs.renaming = it },
                         onDelete = { docs.deleting = it },
                         onTags = { docs.tagging = it },
+                        onInfo = { docs.info = it },
                     )
                     Half(
                         title = "Холсты",
@@ -149,6 +150,7 @@ fun HomeScreen(
                         onRename = { docs.renaming = it },
                         onDelete = { docs.deleting = it },
                         onTags = { docs.tagging = it },
+                        onInfo = { docs.info = it },
                     )
                 }
             }
@@ -176,6 +178,7 @@ private fun Half(
     onRename: (NotebookEntry) -> Unit,
     onDelete: (NotebookEntry) -> Unit,
     onTags: (NotebookEntry) -> Unit,
+    onInfo: (NotebookEntry) -> Unit,
     leading: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     // Заметки — тёплый бледно-зелёный фон, холсты — бледно-голубой: лёгкие светлые пастельные тона в любой теме,
@@ -218,6 +221,7 @@ private fun Half(
                         onRename = { onRename(e) },
                         onDelete = { onDelete(e) },
                         onTags = { onTags(e) },
+                        onInfo = { onInfo(e) },
                         modifier = Modifier.height(cardHeight),
                         ink = ink,
                     )

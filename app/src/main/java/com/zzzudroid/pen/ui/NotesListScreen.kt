@@ -111,6 +111,7 @@ fun NotesListScreen(kind: DocKind, onBack: () -> Unit, onOpen: (String) -> Unit)
                             onRename = { docs.renaming = e },
                             onDelete = { docs.deleting = e },
                             onTags = { docs.tagging = e },
+                            onInfo = { docs.info = e },
                         )
                     }
                 }

@@ -71,6 +71,12 @@ data class NotebookMeta(
     val bookmarks: List<Bookmark> = emptyList(),
     /** Текстовые теги документа («планерка», «идеи»). */
     val tags: List<String> = emptyList(),
+    /** Откуда импортирован PDF: идентификатор источника (uri выбора файла); null — не PDF-копия или импорт был раньше. */
+    val pdfOrigin: String? = null,
+    /** Имя исходного PDF-файла (с расширением), как оно было при импорте. */
+    val pdfOriginName: String? = null,
+    /** На страницах есть штрихи. Не хранится в meta.json, считается при чтении по размерам файлов штрихов. */
+    val hasInk: Boolean = false,
 ) {
     val isBoard get() = kind == DocKind.BOARD
 
@@ -94,6 +100,7 @@ object NotebookFormat {
     private const val THUMB = "thumb.png"
     private const val SOURCE_PDF = "source.pdf"
     private const val THUMB_WIDTH = 300
+    private const val EMPTY_STROKES_SIZE = 4L
     private fun pageEntry(id: String) = "pages/$id.strokes"
 
     // --- Запись ---
@@ -194,7 +201,9 @@ object NotebookFormat {
     fun readMeta(file: File): NotebookMeta = ZipFile(file).use { zip ->
         val text = zip.getInputStream(zip.getEntry(META) ?: throw IOException("Нет $META"))
             .bufferedReader().readText()
-        MetaJson.parse(text, file.name, file.lastModified(), hasPdfSource = zip.getEntry(SOURCE_PDF) != null)
+        // Пустой файл штрихов — 4 байта (число штрихов = 0)
+        val hasInk = zip.entries().asSequence().any { it.name.startsWith("pages/") && it.size > EMPTY_STROKES_SIZE }
+        MetaJson.parse(text, file.name, file.lastModified(), hasPdfSource = zip.getEntry(SOURCE_PDF) != null, hasInk = hasInk)
     }
 
     fun readPages(file: File, meta: NotebookMeta): Map<String, List<Stroke>> = ZipFile(file).use { zip ->

@@ -36,6 +36,8 @@ object MetaJson {
         put("docId", m.docId)
         put("links", JSONArray(m.links.map(::linkToJson)))
         if (m.tags.isNotEmpty()) put("tags", JSONArray(m.tags))
+        m.pdfOrigin?.let { put("pdfOrigin", it) }
+        m.pdfOriginName?.let { put("pdfOriginName", it) }
         put("bookmarks", JSONArray(m.bookmarks.map { b ->
             JSONObject().put("id", b.id).put("name", b.name).put("view", viewToJson(b.view))
         }))
@@ -87,7 +89,7 @@ object MetaJson {
      * Разбор meta.json (v1–v3). Документ без `docId` (v1/v2) получает постоянный идентификатор, выведенный из имени файла:
      * он одинаков при каждом открытии и записывается в файл при первом сохранении (в том числе при переименовании).
      */
-    fun parse(text: String, fileName: String, fileModified: Long, hasPdfSource: Boolean): NotebookMeta {
+    fun parse(text: String, fileName: String, fileModified: Long, hasPdfSource: Boolean, hasInk: Boolean = false): NotebookMeta {
         val j = JSONObject(text)
         val version = j.optInt("formatVersion", 1)
         if (version > NotebookFormat.FORMAT_VERSION) throw IOException("Файл новой версии формата ($version), обновите приложение")
@@ -123,6 +125,9 @@ object MetaJson {
             modified = j.optLong("modified", fileModified),
             pages = pages,
             hasPdfSource = hasPdfSource,
+            pdfOrigin = j.optString("pdfOrigin").ifBlank { null },
+            pdfOriginName = j.optString("pdfOriginName").ifBlank { null },
+            hasInk = hasInk,
             kind = DocKind.byId(j.optString("kind", DocKind.NOTEBOOK.id)),
             boardView = j.optJSONObject("boardView")?.let { v ->
                 BoardView(v.getDouble("scale").toFloat(), v.getDouble("tx").toFloat(), v.getDouble("ty").toFloat())

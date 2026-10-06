@@ -39,6 +39,19 @@ class NotebookMetaTest {
     }
 
     @Test
+    fun `источник PDF записывается и читается, у старых файлов его нет`() {
+        val text = MetaJson.text(meta().copy(pdfOrigin = "content://x/document/1", pdfOriginName = "Книга.pdf"))
+        val back = MetaJson.parse(text, "x.pen", 0, hasPdfSource = true)
+        assertEquals("content://x/document/1", back.pdfOrigin)
+        assertEquals("Книга.pdf", back.pdfOriginName)
+        val old = MetaJson.parse(MetaJson.text(meta()), "x.pen", 0, hasPdfSource = true)
+        assertEquals(null, old.pdfOrigin)
+        assertEquals(null, old.pdfOriginName)
+        // «есть заметки» в файл не пишется — считается при чтении по размерам файлов штрихов
+        assertTrue(!text.contains("hasInk"))
+    }
+
+    @Test
     fun `теги записываются и читаются, чистятся при чтении`() {
         val text = MetaJson.text(meta().copy(tags = listOf("Идеи", "планерка")))
         assertEquals(listOf("Идеи", "планерка"), MetaJson.parse(text, "x.pen", 0, false).tags)

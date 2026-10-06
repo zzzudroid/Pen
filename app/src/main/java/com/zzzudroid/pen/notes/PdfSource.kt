@@ -46,7 +46,7 @@ object PdfRendering {
 }
 
 /** Импорт PDF: тетрадь, где каждая страница — страница PDF своего размера с подложкой. */
-fun NotebookStore.importPdf(context: Context, uri: Uri, title: String): String {
+fun NotebookStore.importPdf(context: Context, uri: Uri, title: String, originName: String? = null): String {
     root.mkdirs()
     // PdfRenderer нужен seekable-файл — копируем источник во временный файл
     val tmp = File(context.cacheDir, "import-${System.currentTimeMillis()}.pdf")
@@ -83,6 +83,8 @@ fun NotebookStore.importPdf(context: Context, uri: Uri, title: String): String {
             modified = now,
             pages = pages,
             hasPdfSource = true,
+            pdfOrigin = uri.toString(),
+            pdfOriginName = originName,
         )
         val name = FileNames.unique(meta.title) { candidate ->
             root.list().orEmpty().any { it.equals(candidate, ignoreCase = true) }
