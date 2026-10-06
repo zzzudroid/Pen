@@ -285,7 +285,8 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                         count = vm.version.let { vm.pages.size },
                         onPrev = { vm.goToPage(vm.pageIndex - 1) },
                         onNext = { vm.goToPage(vm.pageIndex + 1) },
-                        onAdd = vm::addPageAfterCurrent,
+                        // В разметке PDF чистые страницы не нужны, а кнопка рядом с «>» нажималась случайно
+                        onAdd = if (vm.pdfSource == null) vm::addPageAfterCurrent else null,
                         onDelete = { confirmDeletePage = true },
                     )
                     }
@@ -357,7 +358,7 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
 }
 
 @Composable
-private fun PageBar(index: Int, count: Int, onPrev: () -> Unit, onNext: () -> Unit, onAdd: () -> Unit, onDelete: () -> Unit) {
+private fun PageBar(index: Int, count: Int, onPrev: () -> Unit, onNext: () -> Unit, onAdd: (() -> Unit)?, onDelete: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -375,10 +376,12 @@ private fun PageBar(index: Int, count: Int, onPrev: () -> Unit, onNext: () -> Un
             Icon(Icons.AutoMirrored.Outlined.NavigateNext, contentDescription = "Следующая страница")
         }
         Spacer(Modifier.width(16.dp))
-        TextButton(onClick = onAdd) {
-            Icon(Icons.AutoMirrored.Outlined.NoteAdd, contentDescription = null)
-            Spacer(Modifier.width(6.dp))
-            Text("Страница")
+        if (onAdd != null) {
+            TextButton(onClick = onAdd) {
+                Icon(Icons.AutoMirrored.Outlined.NoteAdd, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Страница")
+            }
         }
     }
 }
