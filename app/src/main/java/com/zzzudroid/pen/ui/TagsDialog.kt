@@ -51,6 +51,8 @@ fun TagsDialog(
     var tags by remember { mutableStateOf(Tags.clean(initial)) }
     var typed by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
+    // Поле ввода получает фокус при открытии: сразу можно печатать
+    androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
 
     fun commitTyped() {
         tags = Tags.add(tags, typed)
