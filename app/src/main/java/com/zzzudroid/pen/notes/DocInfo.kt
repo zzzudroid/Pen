@@ -32,6 +32,31 @@ object DocInfo {
             "«$title» — копия PDF без заметок. Удалится только копия; исходный PDF-файл не пострадает."
     }
 
+    /** Заголовок подтверждения удаления нескольких документов: «Удалить 3 документа?». */
+    fun deleteManyTitle(n: Int): String = "Удалить $n ${plural(n, "документ", "документа", "документов")}?"
+
+    /** Что сказать при удалении нескольких: копии PDF с заметками выделяем отдельно — это единственное, чего может быть жалко. */
+    fun deleteManyWarning(metas: List<NotebookMeta?>): String {
+        val withInk = metas.count { it?.hasPdfSource == true && it.hasInk }
+        val pdfCopies = metas.count { it?.hasPdfSource == true }
+        return buildString {
+            append("Документы будут удалены без возможности восстановления.")
+            if (pdfCopies > 0) append(" Исходные PDF-файлы копий не пострадают.")
+            if (withInk > 0) append(" Копий PDF с вашими заметками среди них: $withInk.")
+        }
+    }
+
+    private fun plural(n: Int, one: String, few: String, many: String): String {
+        val m100 = n % 100
+        val m10 = n % 10
+        return when {
+            m100 in 11..14 -> many
+            m10 == 1 -> one
+            m10 in 2..4 -> few
+            else -> many
+        }
+    }
+
     /** («авторитет», id документа) из content://авторитет/document/id; null — адрес другого вида. */
     private fun parse(uri: String): Pair<String, String>? {
         val rest = uri.removePrefix("content://").takeIf { it != uri } ?: return null

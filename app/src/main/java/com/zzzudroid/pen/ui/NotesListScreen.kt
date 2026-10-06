@@ -52,10 +52,19 @@ fun NotesListScreen(kind: DocKind, onBack: () -> Unit, onOpen: (String) -> Unit)
     val isBoard = kind == DocKind.BOARD
     var selectedTag by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
 
+    androidx.activity.compose.BackHandler(enabled = docs.selecting) { docs.clearSelection() }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
+            if (docs.selecting) SelectionBar(
+                count = docs.selected.size,
+                onSelectAll = {
+                    val visible = HomeLogic.all(docs.entries.orEmpty(), kind).filter { Tags.matches(it.meta?.tags.orEmpty(), selectedTag) }
+                    docs.selected = visible.map { it.id }.toSet()
+                },
+                onDelete = { docs.deletingMany = docs.selectedEntries() },
+                onCancel = { docs.clearSelection() },
+            ) else TopAppBar(
                 title = { Text(if (isBoard) "Холсты" else "Заметки") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -112,6 +121,10 @@ fun NotesListScreen(kind: DocKind, onBack: () -> Unit, onOpen: (String) -> Unit)
                             onDelete = { docs.deleting = e },
                             onTags = { docs.tagging = e },
                             onInfo = { docs.info = e },
+                            selecting = docs.selecting,
+                            selected = e.id in docs.selected,
+                            onToggle = { docs.toggle(e.id) },
+                            onLongPress = { docs.toggle(e.id) },
                         )
                     }
                 }

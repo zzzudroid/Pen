@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -70,6 +73,24 @@ class DocumentsState(
     var deleting by mutableStateOf<NotebookEntry?>(null)
     var tagging by mutableStateOf<NotebookEntry?>(null)
     var info by mutableStateOf<NotebookEntry?>(null)
+
+    /** Отмеченные карточки (идентификаторы); пусто — обычный режим, не пусто — режим выбора. */
+    var selected by mutableStateOf<Set<String>>(emptySet())
+    val selecting: Boolean get() = selected.isNotEmpty()
+
+    /** Подтверждение удаления нескольких документов. */
+    var deletingMany by mutableStateOf<List<NotebookEntry>?>(null)
+
+    fun toggle(id: String) {
+        selected = if (id in selected) selected - id else selected + id
+    }
+
+    fun clearSelection() {
+        selected = emptySet()
+    }
+
+    /** Отмеченные документы из текущего списка (исчезнувшие с диска отбрасываются). */
+    fun selectedEntries(): List<NotebookEntry> = entries.orEmpty().filter { it.id in selected }
 
     /** Выполнить операцию с хранилищем на IO, показать ошибку, если она случилась, и обновить список. */
     fun storeOp(action: () -> Unit) {
@@ -133,7 +154,12 @@ fun rememberDocumentsState(snackbar: SnackbarHostState): DocumentsState {
         onDispose { lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(state.hasAccess, state.refresh) {
-        if (state.hasAccess) state.entries = withContext(Dispatchers.IO) { NotebookStore.list() }
+        if (state.hasAccess) {
+            state.entries = withContext(Dispatchers.IO) { NotebookStore.list() }
+            // Выбор не должен держать документы, которых больше нет (удалены, переименованы)
+            val alive = state.entries.orEmpty().map { it.id }.toSet()
+            if (!alive.containsAll(state.selected)) state.selected = state.selected.intersect(alive)
+        }
     }
     return state
 }
@@ -187,6 +213,22 @@ fun DocumentDialogs(state: DocumentsState) {
 
     state.info?.let { e -> DocumentInfoDialog(e, onDismiss = { state.info = null }) }
 
+    state.deletingMany?.let { list ->
+        AlertDialog(
+            onDismissRequest = { state.deletingMany = null },
+            title = { Text(DocInfo.deleteManyTitle(list.size)) },
+            text = { Text(DocInfo.deleteManyWarning(list.map { it.meta })) },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.deletingMany = null
+                    state.clearSelection()
+                    state.storeOp { list.forEach { NotebookStore.delete(it.id) } }
+                }) { Text("Удалить") }
+            },
+            dismissButton = { TextButton(onClick = { state.deletingMany = null }) { Text("Отмена") } },
+        )
+    }
+
     state.deleting?.let { e ->
         AlertDialog(
             onDismissRequest = { state.deleting = null },
@@ -200,6 +242,32 @@ fun DocumentDialogs(state: DocumentsState) {
             },
             dismissButton = { TextButton(onClick = { state.deleting = null }) { Text("Отмена") } },
         )
+    }
+}
+
+/**
+ * Панель режима выбора вместо шапки: «Выбрано N», при необходимости «Выбрать все», «Удалить» и закрытие.
+ * [onSelectAll] = null — кнопки «Выбрать все» нет (на главном экране видны только последние документы).
+ */
+@Composable
+fun SelectionBar(count: Int, onSelectAll: (() -> Unit)?, onDelete: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.material3.Surface(modifier.fillMaxWidth(), tonalElevation = 6.dp, shadowElevation = 4.dp) {
+        androidx.compose.foundation.layout.Row(
+            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            androidx.compose.material3.IconButton(onClick = onCancel) {
+                androidx.compose.material3.Icon(Icons.Filled.Close, contentDescription = "Отменить выбор")
+            }
+            Text("Выбрано: $count", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (onSelectAll != null) TextButton(onClick = onSelectAll) { Text("Выбрать все") }
+            TextButton(onClick = onDelete, enabled = count > 0) {
+                androidx.compose.material3.Icon(Icons.Filled.Delete, contentDescription = null)
+                androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 6.dp))
+                Text("Удалить")
+            }
+        }
     }
 }
 

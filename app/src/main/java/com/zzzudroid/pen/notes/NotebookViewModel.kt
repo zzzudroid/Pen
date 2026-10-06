@@ -55,6 +55,9 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
 
     private var loaded = false
     private var dirty = false
+
+    /** Документ удалён как пустой при выходе — дальше ничего не сохраняем, иначе файл появится снова. */
+    @Volatile private var discarded = false
     private var saveJob: Job? = null
 
     init {
@@ -178,6 +181,40 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     @Volatile private var pdfStale = false
 
     /**
+     * Вызывается при явном выходе из редактора («Назад»): новая нетронутая заметка или холст не должны оставаться
+     * в списке. Не вызывается при повороте экрана и сворачивании — тогда экран закрывается не по воле человека.
+     * Возвращает true, если документ удалён. Удаление идёт под тем же замком, что и запись, и дожидается её,
+     * поэтому после возврата список уже не покажет документ.
+     */
+    fun discardIfEmpty(): Boolean {
+        val m = meta ?: return false
+        if (!loaded || discarded) return false
+        val empty = EmptyDoc.isDiscardable(
+            hasPdfSource = m.hasPdfSource,
+            pageCount = pages.size,
+            strokeCount = pages.sumOf { it.strokes.size },
+            linkCount = pages.sumOf { it.links.size },
+            bookmarkCount = bookmarks.size,
+            tagCount = m.tags.size,
+        )
+        if (!empty) return false
+        discarded = true
+        saveJob?.cancel()
+        dirty = false
+        try {
+            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                NotebookStore.writeLock.withLock { NotebookStore.delete(id) }
+            }
+        } catch (e: Exception) {
+            // Не вышло удалить — пусть остаётся как обычный документ, сохранение снова разрешаем
+            Log.w(TAG, "Не удалось удалить пустой документ $id", e)
+            discarded = false
+            return false
+        }
+        return true
+    }
+
+    /**
      * Сохранить сразу, если есть изменения. Снимок берётся на главном потоке,
      * запись идёт в области процесса — она доживёт до конца даже после закрытия экрана.
      */
@@ -197,6 +234,7 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
     /** Запустить сохранение, если есть изменения; возвращает задачу записи или null. */
     private fun startSave(force: Boolean): Job? {
         saveJob?.cancel()
+        if (discarded) return null
         val m = meta ?: return null
         // У доски сохраняем и вид: сдвиг/масштаб без правок тоже стоит записать
         val view = if (m.isBoard) BoardView(viewport.scale, viewport.tx, viewport.ty) else null

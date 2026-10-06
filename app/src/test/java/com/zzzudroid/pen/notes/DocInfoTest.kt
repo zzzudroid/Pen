@@ -48,4 +48,22 @@ class DocInfoTest {
         val withInk = DocInfo.deleteWarning("Книга", meta(pdf = true, ink = true))
         assertTrue(withInk, withInk.contains("с вашими заметками") && withInk.contains("исходный PDF-файл не пострадает"))
     }
+
+    @Test
+    fun `заголовок удаления нескольких склоняет слово`() {
+        assertEquals("Удалить 1 документ?", DocInfo.deleteManyTitle(1))
+        assertEquals("Удалить 3 документа?", DocInfo.deleteManyTitle(3))
+        assertEquals("Удалить 5 документов?", DocInfo.deleteManyTitle(5))
+        assertEquals("Удалить 11 документов?", DocInfo.deleteManyTitle(11))
+        assertEquals("Удалить 21 документ?", DocInfo.deleteManyTitle(21))
+        assertEquals("Удалить 24 документа?", DocInfo.deleteManyTitle(24))
+    }
+
+    @Test
+    fun `при удалении нескольких копии PDF с заметками названы отдельно`() {
+        val plain = DocInfo.deleteManyWarning(listOf(meta(pdf = false, ink = false), null))
+        assertEquals("Документы будут удалены без возможности восстановления.", plain)
+        val mixed = DocInfo.deleteManyWarning(listOf(meta(pdf = true, ink = false), meta(pdf = true, ink = true), meta(pdf = true, ink = true)))
+        assertTrue(mixed, mixed.contains("Исходные PDF-файлы копий не пострадают") && mixed.contains("с вашими заметками среди них: 2"))
+    }
 }

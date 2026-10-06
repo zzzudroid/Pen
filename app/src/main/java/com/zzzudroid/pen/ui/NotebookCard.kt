@@ -3,7 +3,9 @@ package com.zzzudroid.pen.ui
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.Card
@@ -61,6 +64,11 @@ fun NotebookCard(
     onDelete: () -> Unit,
     onTags: () -> Unit = {},
     onInfo: () -> Unit = {},
+    /** Режим выбора: касание отмечает карточку, меню действий скрыто. */
+    selecting: Boolean = false,
+    selected: Boolean = false,
+    onToggle: () -> Unit = {},
+    onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** Цвет надписей на светлой пастельной подложке главного экрана; null — обычная тёмная/светлая карточка темы. */
     ink: Color? = null,
@@ -72,9 +80,11 @@ fun NotebookCard(
     val fileSize = remember(entry.file, entry.meta?.modified) { Formatting.formatFileSize(entry.file.length()) }
     var menu by remember { mutableStateOf(false) }
 
+    @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
     Card(
-        onClick = onOpen,
-        modifier = modifier,
+        modifier = modifier
+            .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier)
+            .combinedClickable(onClick = if (selecting) onToggle else onOpen, onLongClick = onLongPress),
         colors = if (ink != null) androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f), contentColor = ink)
         else androidx.compose.material3.CardDefaults.cardColors(),
     ) {
@@ -86,8 +96,16 @@ fun NotebookCard(
                 Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
             }
             if (entry.meta == null) Text("Файл повреждён", color = MaterialTheme.colorScheme.error)
-            // Меню действий — кружок в левом верхнем углу миниатюры, чтобы подпись занимала всю ширину карточки
-            Box(Modifier.align(Alignment.TopStart).padding(6.dp)) {
+            // В режиме выбора вместо меню — отметка; иначе меню действий — кружок в левом верхнем углу миниатюры,
+            // чтобы подпись занимала всю ширину карточки
+            if (selecting) Box(
+                Modifier.align(Alignment.TopStart).padding(6.dp).size(32.dp)
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color(0xB3000000), CircleShape)
+                    .border(2.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбрано", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimary)
+            } else Box(Modifier.align(Alignment.TopStart).padding(6.dp)) {
                 Box(
                     Modifier.size(32.dp).background(Color(0xB3000000), CircleShape).clickable { menu = true },
                     contentAlignment = Alignment.Center,

@@ -162,14 +162,19 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
     // Полноэкранный режим: рабочая область на весь экран, без панелей и системных полос
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     SystemBarsHidden(fullscreen)
-    BackHandler(enabled = fullscreen) { fullscreen = false }
+    // Явный выход: пустую новую заметку или холст удаляем, чтобы не копились пустые карточки
+    val leave = {
+        vm.discardIfEmpty()
+        onBack()
+    }
+    BackHandler { if (fullscreen) fullscreen = false else leave() }
 
     Scaffold(
         topBar = {
             if (!fullscreen) TopAppBar(
                 title = { Text(meta?.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },

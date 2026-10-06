@@ -108,6 +108,8 @@ fun HomeScreen(
             }
         },
     ) {
+    // Назад в режиме выбора снимает выбор, а не закрывает экран
+    androidx.activity.compose.BackHandler(enabled = docs.selecting) { docs.clearSelection() }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -137,6 +139,7 @@ fun HomeScreen(
                         onDelete = { docs.deleting = it },
                         onTags = { docs.tagging = it },
                         onInfo = { docs.info = it },
+                        docs = docs,
                     )
                     Half(
                         title = "Холсты",
@@ -151,9 +154,17 @@ fun HomeScreen(
                         onDelete = { docs.deleting = it },
                         onTags = { docs.tagging = it },
                         onInfo = { docs.info = it },
+                        docs = docs,
                     )
                 }
             }
+            if (docs.selecting) SelectionBar(
+                count = docs.selected.size,
+                onSelectAll = null,
+                onDelete = { docs.deletingMany = docs.selectedEntries() },
+                onCancel = { docs.clearSelection() },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
     }
@@ -179,6 +190,7 @@ private fun Half(
     onDelete: (NotebookEntry) -> Unit,
     onTags: (NotebookEntry) -> Unit,
     onInfo: (NotebookEntry) -> Unit,
+    docs: DocumentsState,
     leading: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     // Заметки — тёплый бледно-зелёный фон, холсты — бледно-голубой: лёгкие светлые пастельные тона в любой теме,
@@ -222,6 +234,10 @@ private fun Half(
                         onDelete = { onDelete(e) },
                         onTags = { onTags(e) },
                         onInfo = { onInfo(e) },
+                        selecting = docs.selecting,
+                        selected = e.id in docs.selected,
+                        onToggle = { docs.toggle(e.id) },
+                        onLongPress = { docs.toggle(e.id) },
                         modifier = Modifier.height(cardHeight),
                         ink = ink,
                     )
