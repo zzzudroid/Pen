@@ -8,7 +8,7 @@ context: |
   Стек: Kotlin 2.0.21, Jetpack Compose, AGP 8.7.2, Gradle 8.10.2, JDK 17, version catalog, androidx.ink,
   androidx.graphics (front-buffered rendering), androidx.input motion prediction.
   Пакет com.zzzudroid.pen, один модуль app. Соглашения — как в соседних проектах
-  c:\Projects\Personal\VoiceTimer и moibabki-android (BuildConfig с BUILD_TIME/GIT_HASH/GIT_DIRTY,
+  c:\Projects - Personal\Android\VoiceTimer и moibabki-android (BuildConfig с BUILD_TIME/GIT_HASH/GIT_DIRTY,
   keystore.properties для release, dist/ для бэкапов APK, CHANGELOG.md).
   Доступ с ПК: открытая папка Documents/Pen + автоэкспорт PDF; Syncthing — только возможность на будущее, не реализуем.
   Разработка ведётся и на Windows, и на Linux: всё машинно-зависимое — только в local.properties.
