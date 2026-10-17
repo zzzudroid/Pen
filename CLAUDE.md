@@ -15,6 +15,13 @@ Pen — личное Android-приложение для рукописного 
 - Разработка идёт на Windows и Linux: машинно-зависимое — только в `local.properties` / `keystore.properties` (оба не в git).
 - Каждое изменение отражать в `CHANGELOG.md`.
 
+## Окружение (17.10.2026)
+
+- Проект лежит в `C:\Projects - Personal\Android\Pen` (перенесён из `C:\Projects\Personal\Pen`); соседний образец — `..\VoiceTimer`.
+- Программы — общие установки: Android SDK `%LOCALAPPDATA%\Android\Sdk`, JDK 17 Eclipse Adoptium, Gradle через `gradlew`.
+  Свои копии в проект не ставить.
+- Реестр проектов и общих инструментов — `C:\Projects\РЕЕСТР ПРОЕКТОВ.md`.
+
 ## Устройство (измерено)
 
 Xiaomi Pad 7 (2410CRP4CG), HyperOS 3.0, Android 16 (SDK 36), 3200×2136 @ 440 dpi, адаптивный 120 Гц.
