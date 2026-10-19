@@ -1,8 +1,8 @@
 ## 1. Каркас проекта
 
 - [x] 1.1 Gradle-проект по образцу moibabki-android (AGP 8.7.2, Kotlin 2.0.21, Gradle 8.10.2, version catalog), модуль `app`, пакет `com.zzzudroid.pen`, SDK 35, arm64; `.gitignore` как в VoiceTimer (`local.properties`, `keystore.properties`, `build/`, `dist/`) — проверка: `gradlew assembleDebug` проходит
-- [ ] 1.2 Compose + Material 3, главный экран со списком разделов и навигацией — проверка: APK ставится через `adb install` и открывается на планшете
-- [ ] 1.3 `BUILD_TIME`/`GIT_HASH`/`GIT_DIRTY` в BuildConfig (как в VoiceTimer) и экран «О программе» — проверка: после пересборки время и хэш на экране обновились
+- [x] 1.2 Compose + Material 3, главный экран со списком разделов и навигацией — проверка: APK ставится через `adb install` и открывается на планшете
+- [x] 1.3 `BUILD_TIME`/`GIT_HASH`/`GIT_DIRTY` в BuildConfig (как в VoiceTimer) и экран «О программе» — проверка: после пересборки время и хэш на экране обновились
 - [x] 1.4 `README.md` (сборка и установка на Windows/PowerShell и Linux/bash, Wi‑Fi‑отладка), `CHANGELOG.md`, `CLAUDE.md` с командами и правилами проекта — проверка: команды из README работают
 
 ## 2. Сбор событий пера
