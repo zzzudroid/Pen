@@ -138,3 +138,7 @@ keyPassword=...
 ```bash
 ./gradlew assembleRelease
 ```
+
+## Лицензия
+
+[MIT](LICENSE).
