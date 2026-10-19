@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Share
@@ -75,6 +76,7 @@ import com.zzzudroid.pen.canvas.DrawingSurface
 import com.zzzudroid.pen.canvas.StrokeOps
 import com.zzzudroid.pen.canvas.ViewState
 import com.zzzudroid.pen.notes.DocIndex
+import com.zzzudroid.pen.notes.DocInfo
 import com.zzzudroid.pen.notes.LinkResolution
 import com.zzzudroid.pen.notes.LinkRouting
 import com.zzzudroid.pen.canvas.PageSpec
@@ -111,6 +113,7 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
     }
 
     var confirmDeletePage by remember { mutableStateOf(false) }
+    var confirmDeleteDoc by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
     var showTags by remember { mutableStateOf(false) }
     var showBacklinks by remember { mutableStateOf(false) }
@@ -234,6 +237,12 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                     IconButton(onClick = { fullscreen = true }) {
                         Icon(Icons.Outlined.Fullscreen, contentDescription = "На весь экран")
                     }
+                    // Удалить документ целиком, не выходя в список (корзина с крестиком — не путать с удалением страницы)
+                    if (meta != null) {
+                        IconButton(onClick = { confirmDeleteDoc = true }) {
+                            Icon(Icons.Outlined.DeleteForever, contentDescription = "Удалить документ")
+                        }
+                    }
                 },
             )
         },
@@ -347,6 +356,23 @@ fun NoteEditorScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: Noteb
                 onDismiss = { showBacklinks = false },
             )
         }
+    }
+
+    if (confirmDeleteDoc) {
+        val m = meta
+        AlertDialog(
+            onDismissRequest = { confirmDeleteDoc = false },
+            title = { Text("Удалить документ?") },
+            text = { Text(DocInfo.deleteWarning(m?.title ?: vm.id, m?.copy(hasInk = vm.hasInk))) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteDoc = false
+                    val error = vm.deleteDocument()
+                    if (error == null) onBack() else vm.notice = "Не удалось удалить: $error"
+                }) { Text("Удалить") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteDoc = false }) { Text("Отмена") } },
+        )
     }
 
     if (confirmDeletePage) {

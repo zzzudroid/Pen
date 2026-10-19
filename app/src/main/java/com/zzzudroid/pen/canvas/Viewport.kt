@@ -45,6 +45,24 @@ class Viewport {
         if (ny != cy) ty = viewH / 2 - ny * scale
     }
 
+    /**
+     * Удержать прямоугольник мира [left]..[right] × [top]..[bottom] на экране [viewW]×[viewH]: если по оси он больше
+     * экрана, его край не отходит от края экрана дальше [margin] пикселей; если помещается — стоит по центру оси.
+     */
+    fun clampToRect(left: Float, top: Float, right: Float, bottom: Float, viewW: Float, viewH: Float, margin: Float) {
+        tx = clampAxis(tx, left * scale, right * scale, viewW, margin)
+        ty = clampAxis(ty, top * scale, bottom * scale, viewH, margin)
+    }
+
+    private fun clampAxis(t: Float, start: Float, end: Float, view: Float, margin: Float): Float {
+        val size = end - start
+        return if (size + 2 * margin <= view) {
+            (view - size) / 2 - start
+        } else {
+            t.coerceIn(view - margin - end, margin - start)
+        }
+    }
+
     fun reset() {
         scale = 1f
         tx = 0f

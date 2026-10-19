@@ -198,6 +198,20 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
             tagCount = m.tags.size,
         )
         if (!empty) return false
+        return deleteNow() == null
+    }
+
+    /**
+     * Удалить открытый документ по просьбе человека (кнопка в редакторе). Возвращает null при успехе,
+     * иначе текст ошибки — документ тогда остаётся и сохраняется как обычно.
+     */
+    fun deleteDocument(): String? {
+        if (meta == null || discarded) return null
+        return deleteNow()
+    }
+
+    /** Отменить отложенное сохранение и удалить файл под замком записи (дожидаясь текущей записи). */
+    private fun deleteNow(): String? {
         discarded = true
         saveJob?.cancel()
         dirty = false
@@ -207,12 +221,16 @@ class NotebookViewModel(handle: SavedStateHandle) : CanvasViewModel() {
             }
         } catch (e: Exception) {
             // Не вышло удалить — пусть остаётся как обычный документ, сохранение снова разрешаем
-            Log.w(TAG, "Не удалось удалить пустой документ $id", e)
+            Log.w(TAG, "Не удалось удалить документ $id", e)
             discarded = false
-            return false
+            dirty = true
+            return e.message ?: "ошибка удаления"
         }
-        return true
+        return null
     }
+
+    /** Есть ли в документе рукописные заметки (для текста подтверждения удаления). */
+    val hasInk: Boolean get() = pages.any { it.strokes.isNotEmpty() }
 
     /**
      * Сохранить сразу, если есть изменения. Снимок берётся на главном потоке,

@@ -64,6 +64,38 @@ class ViewportTest {
     }
 
     @Test
+    fun `большой лист не уходит за края дальше поля`() {
+        val v = Viewport()
+        // Лист 1000×3000 при масштабе 2 (2000×6000 px) на экране 1000×600, поле 16
+        v.set(2f, 0f, 0f)
+        v.panBy(500f, 500f)
+        v.clampToRect(0f, 0f, 1000f, 3000f, 1000f, 600f, 16f)
+        assertEquals(16f, v.tx, 0f)
+        assertEquals(16f, v.ty, 0f)
+        v.panBy(-10_000f, -10_000f)
+        v.clampToRect(0f, 0f, 1000f, 3000f, 1000f, 600f, 16f)
+        assertEquals(1000f - 16f - 2000f, v.tx, 0f)
+        assertEquals(600f - 16f - 6000f, v.ty, 0f)
+        // Внутри допустимого — вид не меняется
+        v.panBy(100f, 100f)
+        val tx = v.tx
+        val ty = v.ty
+        v.clampToRect(0f, 0f, 1000f, 3000f, 1000f, 600f, 16f)
+        assertEquals(tx, v.tx, 0f)
+        assertEquals(ty, v.ty, 0f)
+    }
+
+    @Test
+    fun `маленький лист стоит по центру`() {
+        val v = Viewport()
+        // Лист 100×200 при масштабе 1 на экране 1000×600 — по обеим осям помещается
+        v.panBy(-300f, 400f)
+        v.clampToRect(0f, 0f, 100f, 200f, 1000f, 600f, 16f)
+        assertEquals(450f, v.tx, 0f)
+        assertEquals(200f, v.ty, 0f)
+    }
+
+    @Test
     fun `сброс возвращает исходный вид`() {
         val v = Viewport()
         v.zoomAround(10f, 10f, 4f)

@@ -469,13 +469,22 @@ open class CanvasViewModel : ViewModel() {
 
     fun viewportChanged() {
         if (pageSpec == null && viewWidth > 0) viewport.clampCenter(WORLD_LIMIT, viewWidth.toFloat(), viewHeight.toFloat())
+        clampToPdfPage()
         changed(content = false)
     }
 
     /** Восстановить сохранённый вид (доска открывается там, где её закрыли). */
     protected fun restoreView(scale: Float, tx: Float, ty: Float) {
         viewport.set(scale, tx, ty)
+        clampToPdfPage()
         changed(content = false)
+    }
+
+    /** Страницу с PDF-подложкой нельзя утащить за края: при чтении лист остаётся на экране. */
+    private fun clampToPdfPage() {
+        if (page.pdfPage == null || viewWidth == 0 || viewHeight == 0) return
+        val spec = pageSpec ?: return
+        viewport.clampToRect(0f, 0f, spec.width, spec.height, viewWidth.toFloat(), viewHeight.toFloat(), PAGE_MARGIN_DP * density)
     }
 
     /** Кисть для нового штриха. Размеры заданы в dp при масштабе 100%. */

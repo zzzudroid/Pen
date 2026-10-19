@@ -539,9 +539,18 @@ class DrawingSurface(context: Context, private val vm: CanvasViewModel) : FrameL
     private fun onGestureEnd(time: Long) {
         // Короткий тап без движения: два пальца — отмена, три — повтор
         val tap = time - gestureStart < TAP_MAX_MS && gestureTravel < TAP_MAX_TRAVEL_DP * density
-        if (tap && gestureMaxFingers == 2) vm.undo()
-        if (tap && gestureMaxFingers == 3) vm.redo()
-        if (tap && gestureMaxFingers >= 2) strokesLayer.invalidate()
+        // С замком палец не двигает вид и путь жеста не копится, поэтому касание ладонью (2 точки, ~60 мс)
+        // неотличимо от тапа двумя пальцами и отменяло последний штрих. С замком тапы-команды выключены.
+        val tapCommand = tap && !vm.viewLocked
+        // Диагностика: какие касания пальцами срабатывают как жест-тап (отмена/повтор)
+        if (gestureMaxFingers >= 2) android.util.Log.i(
+            "PenDiag",
+            "Жест пальцами: пальцев=$gestureMaxFingers, ${time - gestureStart} мс, путь=${(gestureTravel / density).toInt()} dp, " +
+                "замок=${vm.viewLocked} → ${if (tapCommand) (if (gestureMaxFingers == 2) "ОТМЕНА" else "ПОВТОР") else "нет"}",
+        )
+        if (tapCommand && gestureMaxFingers == 2) vm.undo()
+        if (tapCommand && gestureMaxFingers == 3) vm.redo()
+        if (tapCommand && gestureMaxFingers >= 2) strokesLayer.invalidate()
         // Тап одним пальцем по области ссылки открывает цель; перо поверх ссылки по-прежнему пишет
         if (tap && gestureMaxFingers == 1) {
             // Пипетка: тап пальцем берёт цвет ближайшего штриха в выбранный пресет
